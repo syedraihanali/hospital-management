@@ -19,7 +19,7 @@ function BookAppointmentPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const timesResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/available_times`, {
+        const timesResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/appointments/available-times`, {
           headers: {
             Authorization: `Bearer ${auth.token}`,
           },
@@ -34,11 +34,7 @@ function BookAppointmentPage() {
         const dates = [...new Set(timesData.map((slot) => slot.ScheduleDate))].sort();
         setUniqueDates(dates);
 
-        const doctorsResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/doctors`, {
-          headers: {
-            Authorization: `Bearer ${auth.token}`,
-          },
-        });
+        const doctorsResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/doctors`);
 
         if (!doctorsResponse.ok) {
           throw new Error('Failed to fetch doctors');
@@ -93,7 +89,7 @@ function BookAppointmentPage() {
     setMessage({ type: '', text: '' });
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/book_appointment`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/appointments/book`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -6,10 +6,29 @@ function SignInPage() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    role: 'patient',
   });
   const [errorMessage, setErrorMessage] = useState('');
   const navigate = useNavigate();
   const { login } = useContext(AuthContext);
+
+  const roleOptions = [
+    { value: 'patient', label: 'Patient' },
+    { value: 'doctor', label: 'Doctor' },
+    { value: 'admin', label: 'Administrator' },
+  ];
+
+  const getDefaultRoute = (role) => {
+    switch (role) {
+      case 'doctor':
+        return '/staff-portal';
+      case 'admin':
+        return '/admin';
+      case 'patient':
+      default:
+        return '/myprofile';
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -33,6 +52,7 @@ function SignInPage() {
       body: JSON.stringify({
         email: formData.email,
         password: formData.password,
+        role: formData.role,
       }),
     })
       .then(async (response) => {
@@ -44,7 +64,8 @@ function SignInPage() {
       })
       .then((data) => {
         login(data.token, data.user);
-        navigate('/myprofile');
+        const redirectPath = getDefaultRoute(data.user?.role);
+        navigate(redirectPath);
       })
       .catch((error) => {
         console.error('Error during sign-in:', error);
@@ -78,6 +99,21 @@ function SignInPage() {
               required
               className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-accent focus:outline-none focus:ring-2 focus:ring-brand-accent"
             />
+          </label>
+          <label className="block text-sm font-semibold text-slate-700">
+            Role
+            <select
+              name="role"
+              value={formData.role}
+              onChange={handleInputChange}
+              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-accent focus:outline-none focus:ring-2 focus:ring-brand-accent"
+            >
+              {roleOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
           {errorMessage && (
             <p className="rounded-md bg-red-100 px-3 py-2 text-sm font-medium text-red-600">{errorMessage}</p>

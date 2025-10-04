@@ -1,4 +1,4 @@
--- MySQL
+-- MySQL schema and seed script for Destination Health
 
 -- ---------------------------
 -- 1. Create the doctors table
@@ -19,8 +19,9 @@ CREATE TABLE IF NOT EXISTS patients (
     BirthDate DATE NOT NULL,
     PhoneNumber VARCHAR(50) NOT NULL,
     Email VARCHAR(255) NOT NULL UNIQUE,
-    Gender VARCHAR(20) NOT NULL,
+    Gender ENUM('Male', 'Female', 'Other', 'Prefer not to say') NOT NULL,
     PasswordHash VARCHAR(255) NOT NULL,
+    Address VARCHAR(255) NOT NULL,
     DoctorID INT,
     FOREIGN KEY (DoctorID) REFERENCES doctors(DoctorID)
         ON UPDATE CASCADE
@@ -28,7 +29,38 @@ CREATE TABLE IF NOT EXISTS patients (
 ) ENGINE=InnoDB;
 
 -- ---------------------------
--- 3. Create the available_time table
+-- 3. Create the admins table
+-- ---------------------------
+CREATE TABLE IF NOT EXISTS admins (
+    AdminID INT AUTO_INCREMENT PRIMARY KEY,
+    FullName VARCHAR(255) NOT NULL
+) ENGINE=InnoDB;
+
+-- ---------------------------
+-- 4. Create the users table
+-- ---------------------------
+CREATE TABLE IF NOT EXISTS users (
+    UserID INT AUTO_INCREMENT PRIMARY KEY,
+    Email VARCHAR(255) NOT NULL UNIQUE,
+    PasswordHash VARCHAR(255) NOT NULL,
+    Role ENUM('admin', 'doctor', 'patient') NOT NULL,
+    AdminID INT NULL,
+    DoctorID INT NULL,
+    PatientID INT NULL,
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (AdminID) REFERENCES admins(AdminID) ON DELETE CASCADE,
+    FOREIGN KEY (DoctorID) REFERENCES doctors(DoctorID) ON DELETE CASCADE,
+    FOREIGN KEY (PatientID) REFERENCES patients(PatientID) ON DELETE CASCADE,
+    CONSTRAINT chk_users_role_reference CHECK (
+        (Role = 'admin' AND AdminID IS NOT NULL AND DoctorID IS NULL AND PatientID IS NULL) OR
+        (Role = 'doctor' AND DoctorID IS NOT NULL AND AdminID IS NULL AND PatientID IS NULL) OR
+        (Role = 'patient' AND PatientID IS NOT NULL AND AdminID IS NULL AND DoctorID IS NULL)
+    )
+) ENGINE=InnoDB;
+
+-- ---------------------------
+-- 5. Create the available_time table
 -- ---------------------------
 CREATE TABLE IF NOT EXISTS available_time (
     AvailableTimeID INT AUTO_INCREMENT PRIMARY KEY,
@@ -43,7 +75,7 @@ CREATE TABLE IF NOT EXISTS available_time (
 ) ENGINE=InnoDB;
 
 -- ---------------------------
--- 4. Create the appointments table
+-- 6. Create the appointments table
 -- ---------------------------
 CREATE TABLE IF NOT EXISTS appointments (
     AppointmentID INT AUTO_INCREMENT PRIMARY KEY,
@@ -62,37 +94,61 @@ CREATE TABLE IF NOT EXISTS appointments (
 ) ENGINE=InnoDB;
 
 -- ---------------------------
--- 5. Create Indexes for Performance
+-- 7. Create Indexes for Performance
 -- ---------------------------
-
--- Index on patients' Email for faster lookups during authentication
 CREATE INDEX idx_patients_email ON patients(Email);
-
--- Index on appointments for patient-based queries
+CREATE INDEX idx_users_role ON users(Role);
 CREATE INDEX idx_appointments_patient_id ON appointments(PatientID);
-
--- Index on appointments for doctor-based queries
 CREATE INDEX idx_appointments_doctor_id ON appointments(DoctorID);
-
--- Index on available_time for doctor-based availability checks
 CREATE INDEX idx_available_time_doctor_id ON available_time(DoctorID);
 
 -- ---------------------------
--- 6. Insert Initial Data into doctors Table
+-- 8. Seed baseline reference data
 -- ---------------------------
-
--- Insert a default doctor if the table is empty
 INSERT INTO doctors (FullName, MaxPatientNumber, CurrentPatientNumber)
 SELECT 'Dr. John Smith', 100, 0 FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM doctors WHERE FullName = 'Dr. John Smith');
 
--- ---------------------------
--- 8. Create Triggers to Maintain CurrentPatientNumber
--- ---------------------------
+INSERT INTO doctors (FullName, MaxPatientNumber, CurrentPatientNumber)
+SELECT 'Dr. Emily Davis', 80, 0 FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM doctors WHERE FullName = 'Dr. Emily Davis');
 
+INSERT INTO doctors (FullName, MaxPatientNumber, CurrentPatientNumber)
+SELECT 'Dr. Michael Brown', 120, 0 FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM doctors WHERE FullName = 'Dr. Michael Brown');
+
+INSERT INTO admins (FullName)
+SELECT 'System Administrator' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM admins WHERE FullName = 'System Administrator');
+
+-- ---------------------------
+-- 9. Seed role-based authentication accounts
+-- ---------------------------
+INSERT INTO users (Email, PasswordHash, Role, AdminID)
+SELECT 'admin@hospital.com', '$2a$10$D5s70fBDZ1.6vQrPYC0.AuBZGAPll7n/eI16oQ4GhWG0V6h78trKC', 'admin', a.AdminID
+FROM admins a
+WHERE a.FullName = 'System Administrator'
+  AND NOT EXISTS (SELECT 1 FROM users WHERE Email = 'admin@hospital.com');
+
+INSERT INTO users (Email, PasswordHash, Role, DoctorID)
+SELECT 'dr.john@hospital.com', '$2a$10$qOpk3gJx/DSdhaEUp.ckNO.bMd3wuW//5DdM.XlZo5Kx2.rvSRszC', 'doctor', d.DoctorID
+FROM doctors d
+WHERE d.FullName = 'Dr. John Smith'
+  AND NOT EXISTS (SELECT 1 FROM users WHERE Email = 'dr.john@hospital.com');
+
+-- Ensure each patient record has a corresponding user entry
+INSERT INTO users (Email, PasswordHash, Role, PatientID)
+SELECT p.Email, p.PasswordHash, 'patient', p.PatientID
+FROM patients p
+WHERE NOT EXISTS (
+    SELECT 1 FROM users u WHERE u.PatientID = p.PatientID
+);
+
+-- ---------------------------
+-- 10. Triggers to maintain doctor patient counts
+-- ---------------------------
 DELIMITER //
 
--- Automatically update CurrentPatientNumber when a new patient is assigned to a doctor
 CREATE TRIGGER trg_after_patient_insert
 AFTER INSERT ON patients
 FOR EACH ROW
@@ -104,7 +160,6 @@ BEGIN
     END IF;
 END//
 
--- Automatically update CurrentPatientNumber when a patient is deleted
 CREATE TRIGGER trg_after_patient_delete
 AFTER DELETE ON patients
 FOR EACH ROW
@@ -116,20 +171,19 @@ BEGIN
     END IF;
 END//
 
--- Update CurrentPatientNumber when a patient's doctor changes
 CREATE TRIGGER trg_after_patient_update
 AFTER UPDATE ON patients
 FOR EACH ROW
 BEGIN
-    IF OLD.DoctorID != NEW.DoctorID OR (OLD.DoctorID IS NULL AND NEW.DoctorID IS NOT NULL) OR (OLD.DoctorID IS NOT NULL AND NEW.DoctorID IS NULL) THEN
-        -- Decrement the old doctor's count if there was one
+    IF OLD.DoctorID != NEW.DoctorID
+        OR (OLD.DoctorID IS NULL AND NEW.DoctorID IS NOT NULL)
+        OR (OLD.DoctorID IS NOT NULL AND NEW.DoctorID IS NULL) THEN
         IF OLD.DoctorID IS NOT NULL THEN
             UPDATE doctors
             SET CurrentPatientNumber = CurrentPatientNumber - 1
             WHERE DoctorID = OLD.DoctorID;
         END IF;
-        
-        -- Increment the new doctor's count if there is one
+
         IF NEW.DoctorID IS NOT NULL THEN
             UPDATE doctors
             SET CurrentPatientNumber = CurrentPatientNumber + 1

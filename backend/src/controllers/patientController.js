@@ -60,6 +60,15 @@ async function getPatients(_req, res) {
 // Retrieves a single patient record by identifier.
 async function getPatientByIdHandler(req, res) {
   const { id } = req.params;
+
+  if (req.user.role === 'patient' && Number.parseInt(id, 10) !== req.user.id) {
+    return res.status(403).json({ message: 'Access denied.' });
+  }
+
+  if (req.user.role !== 'patient' && req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Access denied.' });
+  }
+
   const patient = await findPatientById(id);
   if (!patient) {
     return res.status(404).json({ message: 'Patient not found.' });
@@ -70,6 +79,9 @@ async function getPatientByIdHandler(req, res) {
 // Provides upcoming appointments for the authenticated patient.
 async function getUpcomingAppointmentsForPatient(req, res) {
   const { id } = req.params;
+  if (req.user.role !== 'patient') {
+    return res.status(403).json({ message: 'Access denied.' });
+  }
   if (Number.parseInt(id, 10) !== req.user.id) {
     return res.status(403).json({ message: 'Access denied.' });
   }
@@ -81,6 +93,9 @@ async function getUpcomingAppointmentsForPatient(req, res) {
 // Provides historical appointments for the authenticated patient.
 async function getAppointmentHistoryForPatient(req, res) {
   const { id } = req.params;
+  if (req.user.role !== 'patient') {
+    return res.status(403).json({ message: 'Access denied.' });
+  }
   if (Number.parseInt(id, 10) !== req.user.id) {
     return res.status(403).json({ message: 'Access denied.' });
   }

@@ -11,9 +11,23 @@ import { AuthContext } from './AuthContext';
 import AboutUs from './pages/AboutUs';
 import ServicesPage from './pages/ServicesPage';
 import ReportsPage from './pages/ReportsPage';
+import AdminDashboard from './pages/AdminDashboard';
 
 function App() {
   const { auth } = useContext(AuthContext);
+  const getDefaultRoute = (role) => {
+    switch (role) {
+      case 'doctor':
+        return '/staff-portal';
+      case 'admin':
+        return '/admin';
+      case 'patient':
+      default:
+        return '/myprofile';
+    }
+  };
+
+  const defaultRedirect = getDefaultRoute(auth.user?.role);
 
   return (
     <Router basename="/Capstone-Project">
@@ -28,19 +42,47 @@ function App() {
             <Route path="/reports" element={<ReportsPage />} />
             <Route
               path="/signin"
-              element={!auth.token ? <SignInPage /> : <Navigate to="/myprofile" />}
+              element={!auth.token ? <SignInPage /> : <Navigate to={defaultRedirect} />}
             />
             <Route
               path="/book-appointment"
-              element={auth.token ? <BookAppointmentPage /> : <Navigate to="/signin" />}
+              element={
+                auth.token && auth.user?.role === 'patient' ? (
+                  <BookAppointmentPage />
+                ) : (
+                  <Navigate to={auth.token ? defaultRedirect : '/signin'} />
+                )
+              }
             />
             <Route
               path="/staff-portal"
-              element={auth.token ? <StaffPortal /> : <Navigate to="/staff-portal" />}
+              element={
+                auth.token && auth.user?.role === 'doctor' ? (
+                  <StaffPortal />
+                ) : (
+                  <Navigate to={auth.token ? defaultRedirect : '/signin'} />
+                )
+              }
             />
             <Route
               path="/myprofile"
-              element={auth.token ? <PatientProfile /> : <Navigate to="/signin" />}
+              element={
+                auth.token && auth.user?.role === 'patient' ? (
+                  <PatientProfile />
+                ) : (
+                  <Navigate to={auth.token ? defaultRedirect : '/signin'} />
+                )
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                auth.token && auth.user?.role === 'admin' ? (
+                  <AdminDashboard />
+                ) : (
+                  <Navigate to={auth.token ? defaultRedirect : '/signin'} />
+                )
+              }
             />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

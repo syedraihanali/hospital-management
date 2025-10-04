@@ -29,6 +29,17 @@ function Header() {
   }, [auth.user]);
 
   const userAvatar = auth.user?.avatarUrl || auth.user?.photoURL || auth.user?.picture || '';
+  const dashboardLink = useMemo(() => {
+    switch (auth.user?.role) {
+      case 'doctor':
+        return { path: '/staff-portal', label: 'Doctor Dashboard' };
+      case 'admin':
+        return { path: '/admin', label: 'Admin Dashboard' };
+      case 'patient':
+      default:
+        return { path: '/myprofile', label: 'My Profile' };
+    }
+  }, [auth.user?.role]);
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen((prev) => !prev);
@@ -115,14 +126,14 @@ function Header() {
         {dropdownOpen && (
           <div className="absolute right-0 z-50 mt-3 w-48 rounded-2xl border border-emerald-100 bg-white/95 p-2 shadow-glass">
             <Link
-              to="/myprofile"
+              to={dashboardLink.path}
               onClick={() => {
                 closeDropdown();
                 if (isMobile) closeMobileMenu();
               }}
               className="block rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-brand-secondary/60 hover:text-brand-dark"
             >
-              My Profile
+              {dashboardLink.label}
             </Link>
             <button
               type="button"

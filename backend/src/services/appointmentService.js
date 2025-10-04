@@ -35,6 +35,24 @@ async function getAppointmentHistory(patientId) {
   );
 }
 
+// Retrieves upcoming appointments for a doctor including patient details.
+async function getUpcomingAppointmentsForDoctor(doctorId) {
+  return execute(
+    `SELECT
+        a.AppointmentID,
+        p.FullName AS patient,
+        DATE_FORMAT(at.ScheduleDate, '%Y-%m-%d') AS date,
+        TIME_FORMAT(at.StartTime, '%H:%i') AS startTime,
+        TIME_FORMAT(at.EndTime, '%H:%i') AS endTime
+      FROM appointments a
+      JOIN patients p ON a.PatientID = p.PatientID
+      JOIN available_time at ON a.AvailableTimeID = at.AvailableTimeID
+      WHERE a.DoctorID = ? AND at.ScheduleDate >= CURDATE()
+      ORDER BY at.ScheduleDate ASC, at.StartTime ASC`,
+    [doctorId]
+  );
+}
+
 // Lists available appointment slots for a specific doctor.
 async function getAvailableTimes(doctorId) {
   return execute(
@@ -90,4 +108,5 @@ module.exports = {
   getAppointmentHistory,
   getAvailableTimes,
   bookAppointment,
+  getUpcomingAppointmentsForDoctor,
 };

@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const { execute } = require('../database/query');
+const { execute, transaction } = require('../database/query');
 
 // Persists a new patient with a securely hashed password.
 async function createPatient({
@@ -13,28 +13,40 @@ async function createPatient({
   doctorId,
 }) {
   const passwordHash = await bcrypt.hash(password, 10);
-  const result = await execute(
-    `INSERT INTO patients (FullName, BirthDate, PhoneNumber, Email, Gender, PasswordHash, Address, DoctorID)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [fullName, birthDate, phoneNumber, email, gender, passwordHash, address, doctorId]
-  );
-  return { id: result.insertId, fullName, email };
+  return transaction(async (connection) => {
+    const [patientResult] = await connection.execute(
+      `INSERT INTO patients (FullName, BirthDate, PhoneNumber, Email, Gender, PasswordHash, Address, DoctorID)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [fullName, birthDate, phoneNumber, email, gender, passwordHash, address, doctorId]
+    );
+
+    const patientId = patientResult.insertId;
+
+    await connection.execute(
+      `INSERT INTO users (Email, PasswordHash, Role, PatientID)
+       VALUES (?, ?, 'patient', ?)`,
+      [email, passwordHash, patientId]
+    );
+
+    return { id: patientId, fullName, email };
+  });
 }
 
 // Returns the full list of patients.
 async function listPatients() {
-  return execute('SELECT * FROM patients');
+  return execute(
+    `SELECT PatientID, FullName, BirthDate, PhoneNumber, Email, Gender, Address, DoctorID
+     FROM patients`
+  );
 }
 
 // Retrieves a patient by identifier.
 async function findPatientById(id) {
-  const patients = await execute('SELECT * FROM patients WHERE PatientID = ?', [id]);
-  return patients[0];
-}
-
-// Retrieves a patient by email address.
-async function findPatientByEmail(email) {
-  const patients = await execute('SELECT * FROM patients WHERE Email = ?', [email]);
+  const patients = await execute(
+    `SELECT PatientID, FullName, BirthDate, PhoneNumber, Email, Gender, Address, DoctorID
+     FROM patients WHERE PatientID = ?`,
+    [id]
+  );
   return patients[0];
 }
 
@@ -48,6 +60,5 @@ module.exports = {
   createPatient,
   listPatients,
   findPatientById,
-  findPatientByEmail,
   getDoctorIdForPatient,
 };

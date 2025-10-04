@@ -6,6 +6,10 @@ const { getDoctorIdForPatient } = require('../services/patientService');
 
 // Lists available appointment slots for the authenticated patient.
 async function getAvailableTimesForPatient(req, res) {
+  if (req.user.role !== 'patient') {
+    return res.status(403).json({ error: 'Only patients can view available times.' });
+  }
+
   const patientId = req.user.id;
   const doctorId = await getDoctorIdForPatient(patientId);
 
@@ -19,6 +23,10 @@ async function getAvailableTimesForPatient(req, res) {
 
 // Books an appointment for the authenticated patient using a transactional workflow.
 async function bookAppointmentForPatient(req, res) {
+  if (req.user.role !== 'patient') {
+    return res.status(403).json({ error: 'Only patients can book appointments.' });
+  }
+
   const patientId = req.user.id;
   const { availableTimeID } = req.body;
 
