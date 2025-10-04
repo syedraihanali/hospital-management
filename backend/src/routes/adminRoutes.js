@@ -6,6 +6,8 @@ const { getOverview } = require('../controllers/adminController');
 const {
   fetchAboutContent,
   saveAboutContent,
+  fetchSiteSettings,
+  saveSiteSettings,
   fetchServicePackages,
   createPackage,
   updatePackage,
@@ -26,6 +28,18 @@ router.put(
   authenticateToken,
   authorizeRoles('admin'),
   asyncHandler(saveAboutContent)
+);
+router.get(
+  '/content/site-settings',
+  authenticateToken,
+  authorizeRoles('admin'),
+  asyncHandler(fetchSiteSettings)
+);
+router.put(
+  '/content/site-settings',
+  authenticateToken,
+  authorizeRoles('admin'),
+  asyncHandler(saveSiteSettings)
 );
 router.get(
   '/content/service-packages',

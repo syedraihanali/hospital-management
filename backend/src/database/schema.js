@@ -172,6 +172,9 @@ async function seedDoctors() {
     ['Dr. John Smith', 100, 0],
     ['Dr. Emily Davis', 80, 0],
     ['Dr. Michael Brown', 120, 0],
+    ['Dr. Aisha Rahman', 90, 0],
+    ['Dr. Farid Ahmed', 110, 0],
+    ['Dr. Laila Chowdhury', 85, 0],
   ];
 
   await Promise.all(
@@ -213,6 +216,8 @@ async function seedAdminUser() {
 async function seedDoctorUsers() {
   const defaultDoctorAccounts = [
     { fullName: 'Dr. John Smith', email: 'dr.john@hospital.com', password: 'Doctor@123' },
+    { fullName: 'Dr. Aisha Rahman', email: 'dr.aisha@hospital.com', password: 'Doctor@123' },
+    { fullName: 'Dr. Farid Ahmed', email: 'dr.farid@hospital.com', password: 'Doctor@123' },
   ];
 
   await Promise.all(
@@ -239,64 +244,83 @@ async function seedDoctorUsers() {
 }
 
 async function seedSiteContent() {
-  const existing = await execute('SELECT ContentKey FROM site_content WHERE ContentKey = ?', ['about_page']);
-  if (existing.length > 0) {
-    return;
+  const aboutExists = await execute('SELECT ContentKey FROM site_content WHERE ContentKey = ?', ['about_page']);
+  if (!aboutExists.length) {
+    const aboutContent = {
+      hero: {
+        eyebrow: 'Who We Are',
+        title: 'Destination Health, where compassionate care meets innovation',
+        subtitle: 'Partnering with families across Bangladesh for healthier tomorrows.',
+        description:
+          'Destination Health is a multidisciplinary medical network that blends expert clinicians, modern diagnostics, and digital experiences to keep every patient informed and supported.',
+        stats: [
+          { label: 'Patients cared for annually', value: '45K+' },
+          { label: 'Specialist physicians', value: '120+' },
+          { label: 'Satisfaction rating', value: '98%' },
+        ],
+      },
+      sections: [
+        {
+          title: 'Our Mission',
+          body:
+            'We are dedicated to making healthcare simple, proactive, and relationship driven. Every appointment, lab visit, and follow-up is coordinated to give patients confidence in their care journey.',
+        },
+        {
+          title: 'Comprehensive services under one roof',
+          bullets: [
+            'Family medicine, cardiology, neurology, oncology, and more.',
+            'Modern diagnostic imaging, pathology, and remote consultations.',
+            'Secure digital records with instant access for patients and providers.',
+          ],
+        },
+        {
+          title: 'How we support our community',
+          body:
+            'From preventive screenings to long-term disease management, our teams coordinate personalized care plans that respect each person’s culture, goals, and lifestyle.',
+        },
+        {
+          title: 'Technology that amplifies human care',
+          bullets: [
+            'Online appointment scheduling with real-time availability.',
+            'Automated reminders and follow-up care coordination.',
+            'Telehealth options that extend our reach beyond the hospital walls.',
+          ],
+        },
+      ],
+      callout: {
+        title: 'Ready to experience coordinated care?',
+        description:
+          'Join Destination Health to access a dedicated care team, same-day diagnostics, and a medical partner that listens first.',
+      },
+    };
+
+    await execute(
+      `INSERT INTO site_content (ContentKey, ContentValue)
+       VALUES (?, ?)`,
+      ['about_page', JSON.stringify(aboutContent)]
+    );
   }
 
-  const aboutContent = {
-    hero: {
-      eyebrow: 'Who We Are',
-      title: 'Destination Health, where compassionate care meets innovation',
-      subtitle: 'Partnering with families across Bangladesh for healthier tomorrows.',
-      description:
-        'Destination Health is a multidisciplinary medical network that blends expert clinicians, modern diagnostics, and digital experiences to keep every patient informed and supported.',
-      stats: [
-        { label: 'Patients cared for annually', value: '45K+' },
-        { label: 'Specialist physicians', value: '120+' },
-        { label: 'Satisfaction rating', value: '98%' },
-      ],
-    },
-    sections: [
-      {
-        title: 'Our Mission',
-        body:
-          'We are dedicated to making healthcare simple, proactive, and relationship driven. Every appointment, lab visit, and follow-up is coordinated to give patients confidence in their care journey.',
-      },
-      {
-        title: 'Comprehensive services under one roof',
-        bullets: [
-          'Family medicine, cardiology, neurology, oncology, and more.',
-          'Modern diagnostic imaging, pathology, and remote consultations.',
-          'Secure digital records with instant access for patients and providers.',
-        ],
-      },
-      {
-        title: 'How we support our community',
-        body:
-          'From preventive screenings to long-term disease management, our teams coordinate personalized care plans that respect each person’s culture, goals, and lifestyle.',
-      },
-      {
-        title: 'Technology that amplifies human care',
-        bullets: [
-          'Online appointment scheduling with real-time availability.',
-          'Automated reminders and follow-up care coordination.',
-          'Telehealth options that extend our reach beyond the hospital walls.',
-        ],
-      },
-    ],
-    callout: {
-      title: 'Ready to experience coordinated care?',
-      description:
-        'Join Destination Health to access a dedicated care team, same-day diagnostics, and a medical partner that listens first.',
-    },
-  };
+  const siteSettingsExists = await execute('SELECT ContentKey FROM site_content WHERE ContentKey = ?', ['site_settings']);
+  if (!siteSettingsExists.length) {
+    const siteSettings = {
+      siteName: 'Destination Health',
+      siteTagline: 'Seamless booking, coordinated care teams, and secure records—designed for modern health journeys.',
+      primaryContactPhone: '1-800-123-456',
+      primaryContactEmail: 'care@destinationhealth.com',
+      emergencyContactName: 'Emergency coordination desk',
+      emergencyContactPhone: '1-800-123-456',
+      emergencyContactEmail: 'emergency@destinationhealth.com',
+      emergencyContactAddress: '221B Harbor Street, Seattle, WA',
+      footerNote: 'Secured with HIPAA-compliant infrastructure.',
+    };
 
-  await execute(
-    `INSERT INTO site_content (ContentKey, ContentValue)
-     VALUES (?, ?)`,
-    ['about_page', JSON.stringify(aboutContent)]
-  );
+    await execute(
+      `INSERT INTO site_content (ContentKey, ContentValue)
+       VALUES (?, ?)`,
+      ['site_settings', JSON.stringify(siteSettings)]
+    );
+  }
 }
 
 async function seedServicePackages() {

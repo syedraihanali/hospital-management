@@ -16,6 +16,18 @@ function normalizeStrings(value) {
   return typeof value === 'string' ? value : '';
 }
 
+const defaultSiteSettings = {
+  siteName: 'Destination Health',
+  siteTagline: 'Seamless booking, coordinated care teams, and secure records—designed for modern health journeys.',
+  primaryContactPhone: '1-800-123-456',
+  primaryContactEmail: 'care@destinationhealth.com',
+  emergencyContactName: 'Emergency coordination desk',
+  emergencyContactPhone: '1-800-123-456',
+  emergencyContactEmail: 'emergency@destinationhealth.com',
+  emergencyContactAddress: '221B Harbor Street, Seattle, WA',
+  footerNote: 'Secured with HIPAA-compliant infrastructure.',
+};
+
 function normalizeAboutContent(content = {}) {
   const hero = content.hero || {};
   const sections = Array.isArray(content.sections) ? content.sections : [];
@@ -50,6 +62,21 @@ function normalizeAboutContent(content = {}) {
   };
 }
 
+function normalizeSiteSettings(settings = {}) {
+  return {
+    siteName: normalizeStrings(settings.siteName) || defaultSiteSettings.siteName,
+    siteTagline: normalizeStrings(settings.siteTagline) || defaultSiteSettings.siteTagline,
+    primaryContactPhone: normalizeStrings(settings.primaryContactPhone) || defaultSiteSettings.primaryContactPhone,
+    primaryContactEmail: normalizeStrings(settings.primaryContactEmail) || defaultSiteSettings.primaryContactEmail,
+    emergencyContactName: normalizeStrings(settings.emergencyContactName) || defaultSiteSettings.emergencyContactName,
+    emergencyContactPhone: normalizeStrings(settings.emergencyContactPhone) || defaultSiteSettings.emergencyContactPhone,
+    emergencyContactEmail: normalizeStrings(settings.emergencyContactEmail) || defaultSiteSettings.emergencyContactEmail,
+    emergencyContactAddress:
+      normalizeStrings(settings.emergencyContactAddress) || defaultSiteSettings.emergencyContactAddress,
+    footerNote: normalizeStrings(settings.footerNote) || defaultSiteSettings.footerNote,
+  };
+}
+
 async function getAboutContent() {
   const rows = await execute('SELECT ContentValue FROM site_content WHERE ContentKey = ?', ['about_page']);
   if (!rows.length) {
@@ -57,6 +84,15 @@ async function getAboutContent() {
   }
 
   return normalizeAboutContent(parseJSON(rows[0].ContentValue));
+}
+
+async function getSiteSettings() {
+  const rows = await execute('SELECT ContentValue FROM site_content WHERE ContentKey = ?', ['site_settings']);
+  if (!rows.length) {
+    return normalizeSiteSettings();
+  }
+
+  return normalizeSiteSettings(parseJSON(rows[0].ContentValue));
 }
 
 async function updateAboutContent(content) {
@@ -67,6 +103,19 @@ async function updateAboutContent(content) {
      VALUES (?, ?)
      ON DUPLICATE KEY UPDATE ContentValue = VALUES(ContentValue), UpdatedAt = CURRENT_TIMESTAMP`,
     ['about_page', JSON.stringify(normalized)]
+  );
+
+  return normalized;
+}
+
+async function updateSiteSettings(settings) {
+  const normalized = normalizeSiteSettings(settings);
+
+  await execute(
+    `INSERT INTO site_content (ContentKey, ContentValue)
+     VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE ContentValue = VALUES(ContentValue), UpdatedAt = CURRENT_TIMESTAMP`,
+    ['site_settings', JSON.stringify(normalized)]
   );
 
   return normalized;
@@ -294,6 +343,8 @@ async function deleteServicePackage(packageId) {
 module.exports = {
   getAboutContent,
   updateAboutContent,
+  getSiteSettings,
+  updateSiteSettings,
   getServicePackages,
   getServicePackageById,
   createServicePackage,

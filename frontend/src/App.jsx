@@ -13,6 +13,7 @@ import AboutUs from './pages/AboutUs';
 import ServicesPage from './pages/ServicesPage';
 import ReportsPage from './pages/ReportsPage';
 import AdminDashboard from './pages/AdminDashboard';
+import { SiteSettingsProvider } from './SiteSettingsContext';
 
 function App() {
   const { auth } = useContext(AuthContext);
@@ -32,9 +33,10 @@ function App() {
 
   return (
     <Router basename="/Capstone-Project">
-      <div className="relative flex min-h-screen flex-col bg-gradient-to-br from-brand-secondary via-white to-emerald-50">
-        <Header />
-        <main className="flex-1 px-4 pb-12 pt-28 sm:px-8">
+      <SiteSettingsProvider>
+        <div className="relative flex min-h-screen flex-col bg-gradient-to-br from-brand-secondary via-white to-emerald-50">
+          <Header />
+          <main className="flex-1 px-4 pb-12 pt-28 sm:px-8">
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/register" element={<RegisterPage />} />
@@ -91,8 +93,9 @@ function App() {
             />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
-        </main>
-      </div>
+          </main>
+        </div>
+      </SiteSettingsProvider>
     </Router>
   );
 }

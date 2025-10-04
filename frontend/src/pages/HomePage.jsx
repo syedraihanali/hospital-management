@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import HomeFooter from '../components/home/HomeFooter';
+import { useSiteSettings } from '../SiteSettingsContext';
 
 const testimonials = [
   {
@@ -61,11 +62,14 @@ const formatTimeRange = (start, end) => {
   return `${formatTimeLabel(start)} - ${formatTimeLabel(end)}`;
 };
 
+const sanitizeTel = (value = '') => value.replace(/[^+\d]/g, '');
+
 function HomePage() {
   const apiBaseUrl = useMemo(() => {
     const url = process.env.REACT_APP_API_URL || '';
     return url.endsWith('/') ? url.slice(0, -1) : url;
   }, []);
+  const { siteSettings } = useSiteSettings();
   const [doctors, setDoctors] = useState([]);
   const [doctorsLoading, setDoctorsLoading] = useState(true);
   const [doctorsError, setDoctorsError] = useState('');
@@ -76,6 +80,12 @@ function HomePage() {
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedSlotId, setSelectedSlotId] = useState('');
   const [confirmation, setConfirmation] = useState('');
+
+  const siteName = siteSettings?.siteName ?? 'Destination Health';
+  const emergencyContactName = siteSettings?.emergencyContactName ?? 'Emergency coordination desk';
+  const emergencyPhone = siteSettings?.emergencyContactPhone ?? '';
+  const emergencyEmail = siteSettings?.emergencyContactEmail ?? '';
+  const emergencyAddress = siteSettings?.emergencyContactAddress ?? '';
 
   useEffect(() => {
     let isMounted = true;
@@ -378,18 +388,28 @@ function HomePage() {
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-2xl space-y-2">
             <p className="text-sm uppercase tracking-[0.35em] text-white/70">Need emergency medical care?</p>
-            <h2 className="text-3xl font-semibold sm:text-4xl">Our rapid response clinicians are one tap away</h2>
+            <h2 className="text-3xl font-semibold sm:text-4xl">{emergencyContactName} is one tap away</h2>
             <p className="text-white/80">
               Call our emergency coordination desk for immediate triage and ambulance dispatch across our hospital network.
             </p>
             <div className="flex flex-col gap-2 text-white/80 sm:flex-row sm:items-center sm:gap-6">
-              <span className="text-lg font-semibold tracking-wide">24/7 hotline: <a className="underline-offset-4 hover:underline" href="tel:1800123456">1-800-123-456</a></span>
-              <span>emergency@destinationhealth.com</span>
+              {emergencyPhone ? (
+                <span className="text-lg font-semibold tracking-wide">
+                  24/7 hotline:{' '}
+                  <a className="underline-offset-4 hover:underline" href={`tel:${sanitizeTel(emergencyPhone)}`}>
+                    {emergencyPhone}
+                  </a>
+                </span>
+              ) : null}
+              {emergencyEmail ? <span>{emergencyEmail}</span> : null}
             </div>
+            {emergencyAddress ? (
+              <p className="text-sm text-white/70">{emergencyAddress}</p>
+            ) : null}
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
             <a
-              href="tel:1800123456"
+              href={emergencyPhone ? `tel:${sanitizeTel(emergencyPhone)}` : '#'}
               className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-base font-semibold text-brand-dark shadow-soft transition hover:bg-brand-secondary/90"
             >
               Call now
@@ -411,7 +431,7 @@ function HomePage() {
           </span>
           <h2 className="text-3xl font-semibold text-slate-900 sm:text-4xl">What our patients and partners say</h2>
           <p className="mx-auto max-w-2xl text-sm text-slate-600 sm:text-base">
-            Stories from the people who rely on Destination Health for fast booking, compassionate care, and secure records.
+            Stories from the people who rely on {siteName} for fast booking, compassionate care, and secure records.
           </p>
         </div>
         <div className="grid gap-6 md:grid-cols-3">
