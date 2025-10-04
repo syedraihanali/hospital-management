@@ -156,6 +156,18 @@ INSERT INTO doctors (FullName, MaxPatientNumber, CurrentPatientNumber)
 SELECT 'Dr. Michael Brown', 120, 0 FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM doctors WHERE FullName = 'Dr. Michael Brown');
 
+INSERT INTO doctors (FullName, MaxPatientNumber, CurrentPatientNumber)
+SELECT 'Dr. Aisha Rahman', 90, 0 FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM doctors WHERE FullName = 'Dr. Aisha Rahman');
+
+INSERT INTO doctors (FullName, MaxPatientNumber, CurrentPatientNumber)
+SELECT 'Dr. Farid Ahmed', 110, 0 FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM doctors WHERE FullName = 'Dr. Farid Ahmed');
+
+INSERT INTO doctors (FullName, MaxPatientNumber, CurrentPatientNumber)
+SELECT 'Dr. Laila Chowdhury', 85, 0 FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM doctors WHERE FullName = 'Dr. Laila Chowdhury');
+
 INSERT INTO admins (FullName)
 SELECT 'System Administrator' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM admins WHERE FullName = 'System Administrator');
@@ -206,8 +218,22 @@ SELECT 'about_page', JSON_OBJECT(
         'title', 'Ready to experience coordinated care?',
         'description', 'Join Destination Health to access a dedicated care team, same-day diagnostics, and a medical partner that listens first.'
     )
-)
+    )
 WHERE NOT EXISTS (SELECT 1 FROM site_content WHERE ContentKey = 'about_page');
+
+INSERT INTO site_content (ContentKey, ContentValue)
+SELECT 'site_settings', JSON_OBJECT(
+    'siteName', 'Destination Health',
+    'siteTagline', 'Seamless booking, coordinated care teams, and secure records—designed for modern health journeys.',
+    'primaryContactPhone', '1-800-123-456',
+    'primaryContactEmail', 'care@destinationhealth.com',
+    'emergencyContactName', 'Emergency coordination desk',
+    'emergencyContactPhone', '1-800-123-456',
+    'emergencyContactEmail', 'emergency@destinationhealth.com',
+    'emergencyContactAddress', '221B Harbor Street, Seattle, WA',
+    'footerNote', 'Secured with HIPAA-compliant infrastructure.'
+  )
+WHERE NOT EXISTS (SELECT 1 FROM site_content WHERE ContentKey = 'site_settings');
 
 INSERT INTO service_packages (PackageName, Subtitle, OriginalPrice, DiscountedPrice, SortOrder)
 SELECT 'Package-1', 'Essential wellness screening', 7710, 5900, 1

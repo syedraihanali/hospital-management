@@ -1,5 +1,6 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { AuthContext } from '../AuthContext';
+import { useSiteSettings } from '../SiteSettingsContext';
 
 const apiBaseUrl = process.env.REACT_APP_API_URL;
 
@@ -7,6 +8,7 @@ const tabs = [
   { id: 'overview', label: 'Overview' },
   { id: 'about', label: 'About Page' },
   { id: 'packages', label: 'Service Packages' },
+  { id: 'site-settings', label: 'Site Settings' },
 ];
 
 const createEmptyAboutDraft = () => ({
@@ -40,6 +42,7 @@ const mapPackageResponseToForm = (pkg) => ({
 
 function AdminDashboard() {
   const { auth } = useContext(AuthContext);
+  const { siteSettings, refreshSiteSettings, setCachedSiteSettings } = useSiteSettings();
   const role = auth.user?.role;
 
   const [activeTab, setActiveTab] = useState('overview');
@@ -60,6 +63,12 @@ function AdminDashboard() {
   const [packageFeedback, setPackageFeedback] = useState(null);
   const [packageSavingKey, setPackageSavingKey] = useState(null);
   const [packageDeletingKey, setPackageDeletingKey] = useState(null);
+
+  const [siteSettingsDraft, setSiteSettingsDraft] = useState(null);
+  const [siteSettingsStatus, setSiteSettingsStatus] = useState('idle');
+  const [siteSettingsError, setSiteSettingsError] = useState('');
+  const [siteSettingsFeedback, setSiteSettingsFeedback] = useState(null);
+  const [siteSettingsSaving, setSiteSettingsSaving] = useState(false);
 
   const fetchOverview = useCallback(async () => {
     if (!auth.token) {
@@ -149,6 +158,35 @@ function AdminDashboard() {
     }
   }, [auth.token]);
 
+  const fetchSiteSettings = useCallback(async () => {
+    if (!auth.token) {
+      return;
+    }
+
+    setSiteSettingsStatus('loading');
+    setSiteSettingsError('');
+    setSiteSettingsFeedback(null);
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/admin/content/site-settings`, {
+        headers: {
+          Authorization: `Bearer ${auth.token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Unable to load site settings.');
+      }
+
+      const data = await response.json();
+      setSiteSettingsDraft(deepClone(data || {}));
+      setSiteSettingsStatus('succeeded');
+    } catch (err) {
+      setSiteSettingsError(err.message || 'Failed to load site settings.');
+      setSiteSettingsStatus('failed');
+    }
+  }, [auth.token]);
+
   useEffect(() => {
     if (!auth.token || role !== 'admin') {
       return;
@@ -165,7 +203,23 @@ function AdminDashboard() {
     if (activeTab === 'packages' && packagesStatus === 'idle') {
       fetchPackages();
     }
-  }, [activeTab, auth.token, role, overviewStatus, aboutStatus, packagesStatus, fetchOverview, fetchAboutContent, fetchPackages]);
+
+    if (activeTab === 'site-settings' && siteSettingsStatus === 'idle') {
+      fetchSiteSettings();
+    }
+  }, [
+    activeTab,
+    auth.token,
+    role,
+    overviewStatus,
+    aboutStatus,
+    packagesStatus,
+    siteSettingsStatus,
+    fetchOverview,
+    fetchAboutContent,
+    fetchPackages,
+    fetchSiteSettings,
+  ]);
 
   const renderMetricCard = (title, value) => (
     <div className="rounded-2xl border border-emerald-100 bg-white/90 p-6 shadow-soft" key={title}>
@@ -499,6 +553,51 @@ function AdminDashboard() {
         items: [{ id: null, name: '', price: '' }],
       },
     ]);
+  };
+
+  const handleSiteSettingsFieldChange = (field, value) => {
+    setSiteSettingsDraft((prev) => ({
+      ...(prev || {}),
+      [field]: value,
+    }));
+  };
+
+  const handleSaveSiteSettings = async (event) => {
+    event.preventDefault();
+    if (!auth.token || !siteSettingsDraft) {
+      return;
+    }
+
+    setSiteSettingsSaving(true);
+    setSiteSettingsFeedback(null);
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/admin/content/site-settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${auth.token}`,
+        },
+        body: JSON.stringify(siteSettingsDraft),
+      });
+
+      if (!response.ok) {
+        throw new Error('Unable to save site settings.');
+      }
+
+      const updated = await response.json();
+      setSiteSettingsDraft(deepClone(updated));
+      setCachedSiteSettings(updated);
+      await refreshSiteSettings();
+      setSiteSettingsFeedback({ type: 'success', message: 'Site settings updated successfully.' });
+    } catch (err) {
+      setSiteSettingsFeedback({
+        type: 'error',
+        message: err.message || 'Failed to update site settings.',
+      });
+    } finally {
+      setSiteSettingsSaving(false);
+    }
   };
 
   const sortedPackageDrafts = useMemo(
@@ -963,6 +1062,148 @@ function AdminDashboard() {
                 </div>
               ) : null}
             </div>
+          </section>
+        )
+      ) : null}
+
+      {activeTab === 'site-settings' ? (
+        siteSettingsStatus === 'loading' ? (
+          <div className="flex min-h-[12rem] items-center justify-center text-slate-600">Loading site settings...</div>
+        ) : siteSettingsError ? (
+          <div className="flex min-h-[12rem] items-center justify-center text-red-600">{siteSettingsError}</div>
+        ) : (
+          <section className="flex flex-col gap-6 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card backdrop-blur">
+            <header className="space-y-2">
+              <h2 className="text-xl font-semibold text-brand-primary">Brand & emergency details</h2>
+              <p className="text-sm text-slate-600">
+                Update the public-facing hospital name, footer messaging, and emergency contact information displayed across the site.
+              </p>
+            </header>
+
+            {siteSettingsFeedback ? (
+              <div
+                className={`rounded-2xl border px-4 py-3 text-sm ${
+                  siteSettingsFeedback.type === 'success'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : 'border-rose-200 bg-rose-50 text-rose-700'
+                }`}
+              >
+                {siteSettingsFeedback.message}
+              </div>
+            ) : null}
+
+            <form onSubmit={handleSaveSiteSettings} className="grid gap-6">
+              <section className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5">
+                <h3 className="text-lg font-semibold text-brand-primary">Brand identity</h3>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="font-medium text-slate-700">Site name</span>
+                  <input
+                    type="text"
+                    value={siteSettingsDraft?.siteName ?? siteSettings?.siteName ?? ''}
+                    onChange={(event) => handleSiteSettingsFieldChange('siteName', event.target.value)}
+                    className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-brand-primary focus:outline-none"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="font-medium text-slate-700">Tagline</span>
+                  <textarea
+                    value={siteSettingsDraft?.siteTagline ?? siteSettings?.siteTagline ?? ''}
+                    onChange={(event) => handleSiteSettingsFieldChange('siteTagline', event.target.value)}
+                    rows={2}
+                    className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-brand-primary focus:outline-none"
+                  />
+                </label>
+              </section>
+
+              <section className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5">
+                <h3 className="text-lg font-semibold text-brand-primary">Primary contact</h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-medium text-slate-700">General phone</span>
+                    <input
+                      type="text"
+                      value={siteSettingsDraft?.primaryContactPhone ?? siteSettings?.primaryContactPhone ?? ''}
+                      onChange={(event) => handleSiteSettingsFieldChange('primaryContactPhone', event.target.value)}
+                      className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-brand-primary focus:outline-none"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-medium text-slate-700">General email</span>
+                    <input
+                      type="email"
+                      value={siteSettingsDraft?.primaryContactEmail ?? siteSettings?.primaryContactEmail ?? ''}
+                      onChange={(event) => handleSiteSettingsFieldChange('primaryContactEmail', event.target.value)}
+                      className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-brand-primary focus:outline-none"
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5">
+                <h3 className="text-lg font-semibold text-brand-primary">Emergency contact</h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-medium text-slate-700">Contact name</span>
+                    <input
+                      type="text"
+                      value={siteSettingsDraft?.emergencyContactName ?? siteSettings?.emergencyContactName ?? ''}
+                      onChange={(event) => handleSiteSettingsFieldChange('emergencyContactName', event.target.value)}
+                      className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-brand-primary focus:outline-none"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-medium text-slate-700">Hotline number</span>
+                    <input
+                      type="text"
+                      value={siteSettingsDraft?.emergencyContactPhone ?? siteSettings?.emergencyContactPhone ?? ''}
+                      onChange={(event) => handleSiteSettingsFieldChange('emergencyContactPhone', event.target.value)}
+                      className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-brand-primary focus:outline-none"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-medium text-slate-700">Emergency email</span>
+                    <input
+                      type="email"
+                      value={siteSettingsDraft?.emergencyContactEmail ?? siteSettings?.emergencyContactEmail ?? ''}
+                      onChange={(event) => handleSiteSettingsFieldChange('emergencyContactEmail', event.target.value)}
+                      className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-brand-primary focus:outline-none"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm md:col-span-2">
+                    <span className="font-medium text-slate-700">Emergency address</span>
+                    <textarea
+                      value={siteSettingsDraft?.emergencyContactAddress ?? siteSettings?.emergencyContactAddress ?? ''}
+                      onChange={(event) => handleSiteSettingsFieldChange('emergencyContactAddress', event.target.value)}
+                      rows={2}
+                      className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-brand-primary focus:outline-none"
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5">
+                <h3 className="text-lg font-semibold text-brand-primary">Footer message</h3>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="font-medium text-slate-700">Footer note</span>
+                  <textarea
+                    value={siteSettingsDraft?.footerNote ?? siteSettings?.footerNote ?? ''}
+                    onChange={(event) => handleSiteSettingsFieldChange('footerNote', event.target.value)}
+                    rows={2}
+                    className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-brand-primary focus:outline-none"
+                  />
+                </label>
+              </section>
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={siteSettingsSaving}
+                  className="inline-flex items-center justify-center rounded-full bg-brand-primary px-6 py-2 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-slate-400"
+                >
+                  {siteSettingsSaving ? 'Saving...' : 'Save settings'}
+                </button>
+              </div>
+            </form>
           </section>
         )
       ) : null}

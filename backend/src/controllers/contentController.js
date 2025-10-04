@@ -1,4 +1,4 @@
-const { getAboutContent, getServicePackages } = require('../services/contentService');
+const { getAboutContent, getServicePackages, getSiteSettings } = require('../services/contentService');
 
 async function fetchAboutContent(_req, res) {
   const content = await getAboutContent();
@@ -10,7 +10,13 @@ async function fetchServicePackages(_req, res) {
   res.json(packages);
 }
 
+async function fetchSiteSettings(_req, res) {
+  const settings = await getSiteSettings();
+  res.json(settings);
+}
+
 module.exports = {
   fetchAboutContent,
   fetchServicePackages,
+  fetchSiteSettings,
 };

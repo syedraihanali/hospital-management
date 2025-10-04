@@ -1,6 +1,8 @@
 const {
   getAboutContent,
   updateAboutContent,
+  getSiteSettings,
+  updateSiteSettings,
   getServicePackages,
   createServicePackage,
   updateServicePackage,
@@ -14,6 +16,16 @@ async function fetchAboutContent(_req, res) {
 
 async function saveAboutContent(req, res) {
   const updated = await updateAboutContent(req.body);
+  res.json(updated);
+}
+
+async function fetchSiteSettings(_req, res) {
+  const settings = await getSiteSettings();
+  res.json(settings);
+}
+
+async function saveSiteSettings(req, res) {
+  const updated = await updateSiteSettings(req.body);
   res.json(updated);
 }
 
@@ -56,6 +68,8 @@ async function deletePackage(req, res) {
 module.exports = {
   fetchAboutContent,
   saveAboutContent,
+  fetchSiteSettings,
+  saveSiteSettings,
   fetchServicePackages,
   createPackage,
   updatePackage,

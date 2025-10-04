@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../AuthContext';
 import { FaBars, FaTimes } from 'react-icons/fa';
+import { useSiteSettings } from '../SiteSettingsContext';
 
 const navigationLinks = [
   { label: 'Home', to: '/' },
@@ -13,10 +14,13 @@ const navigationLinks = [
 
 function Header() {
   const { auth, logout } = useContext(AuthContext);
+  const { siteSettings } = useSiteSettings();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+
+  const siteName = siteSettings?.siteName?.trim() ? siteSettings.siteName : 'Destination Health';
 
   const userFirstName = useMemo(() => {
     if (!auth.user) return '';
@@ -160,7 +164,7 @@ function Header() {
               closeDropdown();
             }}
           >
-            Destination Health
+            {siteName}
           </Link>
 
           <nav className="hidden items-center gap-1 lg:flex">
