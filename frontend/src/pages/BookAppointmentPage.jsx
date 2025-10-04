@@ -15,11 +15,12 @@ function BookAppointmentPage() {
   const [selectedTimeID, setSelectedTimeID] = useState('');
 
   const navigate = useNavigate();
+  const apiBaseUrl = (process.env.REACT_APP_API_URL || '').replace(/\/$/, '');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const timesResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/appointments/available-times`, {
+        const timesResponse = await fetch(`${apiBaseUrl}/api/appointments/available-times`, {
           headers: {
             Authorization: `Bearer ${auth.token}`,
           },
@@ -34,7 +35,7 @@ function BookAppointmentPage() {
         const dates = [...new Set(timesData.map((slot) => slot.ScheduleDate))].sort();
         setUniqueDates(dates);
 
-        const doctorsResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/doctors`);
+        const doctorsResponse = await fetch(`${apiBaseUrl}/api/doctors`);
 
         if (!doctorsResponse.ok) {
           throw new Error('Failed to fetch doctors');
@@ -61,9 +62,9 @@ function BookAppointmentPage() {
     if (auth.user && auth.token) {
       fetchData();
     } else {
-      navigate('/signin');
+      navigate('/signin/patient');
     }
-  }, [auth.token, auth.user, navigate]);
+  }, [apiBaseUrl, auth.token, auth.user, navigate]);
 
   const handleDateChange = (e) => {
     const date = e.target.value;
@@ -89,7 +90,7 @@ function BookAppointmentPage() {
     setMessage({ type: '', text: '' });
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/appointments/book`, {
+      const response = await fetch(`${apiBaseUrl}/api/appointments/book`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

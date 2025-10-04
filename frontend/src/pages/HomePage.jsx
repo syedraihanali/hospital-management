@@ -1,49 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import HomeFooter from '../components/home/HomeFooter';
-
-const specialties = [
-  {
-    name: 'Cardiology',
-    doctors: [
-      { name: 'Dr. Ainsley Morgan', location: 'Green Valley Heart Center', nextAvailability: 'Tomorrow · 9:30 AM' },
-      { name: 'Dr. Naveen Patel', location: 'Heart & Vascular Pavilion', nextAvailability: 'Thu · 2:00 PM' },
-    ],
-  },
-  {
-    name: 'Neurology',
-    doctors: [
-      { name: 'Dr. Lila Thompson', location: 'Summit Neurology Clinic', nextAvailability: 'Today · 4:00 PM' },
-      { name: 'Dr. Emmett Ruiz', location: 'NeuroWell Institute', nextAvailability: 'Fri · 10:15 AM' },
-    ],
-  },
-  {
-    name: 'Pediatrics',
-    doctors: [
-      { name: 'Dr. Hana Ibrahim', location: 'Sunrise Pediatrics', nextAvailability: 'Tomorrow · 11:45 AM' },
-      { name: 'Dr. Quinn Reynolds', location: 'Evergreen Family Practice', nextAvailability: 'Mon · 8:50 AM' },
-    ],
-  },
-  {
-    name: 'Orthopedics',
-    doctors: [
-      { name: 'Dr. Mateo Chen', location: 'Motion Plus Orthopedics', nextAvailability: 'Wed · 1:30 PM' },
-      { name: 'Dr. Kylie Anders', location: 'Joint Care Alliance', nextAvailability: 'Fri · 3:20 PM' },
-    ],
-  },
-];
-
-const appointmentTimes = [
-  '08:00 AM',
-  '08:45 AM',
-  '09:30 AM',
-  '10:15 AM',
-  '11:00 AM',
-  '01:30 PM',
-  '02:15 PM',
-  '03:00 PM',
-  '04:30 PM',
-];
 
 const testimonials = [
   {
@@ -69,8 +26,6 @@ const testimonials = [
   },
 ];
 
-const formatDateInput = (date) => date.toISOString().split('T')[0];
-
 const formatReadableDate = (value) => {
   try {
     return new Date(value).toLocaleDateString(undefined, {
@@ -83,37 +38,203 @@ const formatReadableDate = (value) => {
   }
 };
 
+const formatTimeLabel = (timeString) => {
+  if (!timeString) {
+    return '';
+  }
+
+  const [hours, minutes] = timeString.split(':');
+  const date = new Date();
+  date.setHours(Number.parseInt(hours, 10), Number.parseInt(minutes, 10), 0, 0);
+
+  return date.toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
+
+const formatTimeRange = (start, end) => {
+  if (!start || !end) {
+    return '';
+  }
+
+  return `${formatTimeLabel(start)} - ${formatTimeLabel(end)}`;
+};
+
 function HomePage() {
-  const today = useMemo(() => formatDateInput(new Date()), []);
-  const [selectedSpecialty, setSelectedSpecialty] = useState(specialties[0].name);
-  const [selectedDoctor, setSelectedDoctor] = useState(specialties[0].doctors[0].name);
-  const [selectedDate, setSelectedDate] = useState(today);
-  const [selectedTime, setSelectedTime] = useState(appointmentTimes[2]);
+  const apiBaseUrl = useMemo(() => {
+    const url = process.env.REACT_APP_API_URL || '';
+    return url.endsWith('/') ? url.slice(0, -1) : url;
+  }, []);
+  const [doctors, setDoctors] = useState([]);
+  const [doctorsLoading, setDoctorsLoading] = useState(true);
+  const [doctorsError, setDoctorsError] = useState('');
+  const [selectedDoctorId, setSelectedDoctorId] = useState(null);
+  const [availability, setAvailability] = useState([]);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedSlotId, setSelectedSlotId] = useState('');
   const [confirmation, setConfirmation] = useState('');
 
-  const doctorsForSpecialty = useMemo(() => {
-    const specialty = specialties.find((item) => item.name === selectedSpecialty);
-    return specialty ? specialty.doctors : [];
-  }, [selectedSpecialty]);
+  useEffect(() => {
+    let isMounted = true;
 
-  const activeDoctorDetails = useMemo(
-    () => doctorsForSpecialty.find((doctor) => doctor.name === selectedDoctor) || doctorsForSpecialty[0],
-    [doctorsForSpecialty, selectedDoctor],
+    const fetchDoctors = async () => {
+      setDoctorsLoading(true);
+      setDoctorsError('');
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/doctors`);
+        if (!response.ok) {
+          throw new Error('Failed to load doctors.');
+        }
+
+        const data = await response.json();
+        if (isMounted) {
+          setDoctors(data);
+          setSelectedDoctorId(data[0]?.DoctorID ?? null);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setDoctorsError(error.message || 'Unable to retrieve doctors at the moment.');
+          setDoctors([]);
+          setSelectedDoctorId(null);
+        }
+      } finally {
+        if (isMounted) {
+          setDoctorsLoading(false);
+        }
+      }
+    };
+
+    fetchDoctors();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [apiBaseUrl]);
+
+  useEffect(() => {
+    if (!selectedDoctorId) {
+      setAvailability([]);
+      setSelectedDate('');
+      setSelectedSlotId('');
+      return;
+    }
+
+    let isMounted = true;
+
+    const fetchAvailability = async () => {
+      setAvailabilityLoading(true);
+      setAvailabilityError('');
+      try {
+        const response = await fetch(
+          `${apiBaseUrl}/api/doctors/${selectedDoctorId}/available-times?limit=25`
+        );
+        if (!response.ok) {
+          throw new Error('Failed to load availability.');
+        }
+
+        const data = await response.json();
+        if (isMounted) {
+          setAvailability(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setAvailability([]);
+          setAvailabilityError(error.message || 'Unable to load available times.');
+        }
+      } finally {
+        if (isMounted) {
+          setAvailabilityLoading(false);
+        }
+      }
+    };
+
+    fetchAvailability();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [apiBaseUrl, selectedDoctorId]);
+
+  useEffect(() => {
+    if (!selectedDate && availability.length > 0) {
+      setSelectedDate(availability[0].ScheduleDate);
+    }
+  }, [availability, selectedDate]);
+
+  useEffect(() => {
+    const slotsForCurrentDate = availability.filter((slot) => slot.ScheduleDate === selectedDate);
+
+    if (slotsForCurrentDate.length === 0) {
+      setSelectedSlotId('');
+      return;
+    }
+
+    if (!slotsForCurrentDate.some((slot) => String(slot.AvailableTimeID) === selectedSlotId)) {
+      setSelectedSlotId(String(slotsForCurrentDate[0].AvailableTimeID));
+    }
+  }, [availability, selectedDate, selectedSlotId]);
+
+  const availableDates = useMemo(
+    () => [...new Set(availability.map((slot) => slot.ScheduleDate))],
+    [availability]
   );
 
-  const handleSpecialtyChange = (event) => {
-    const value = event.target.value;
-    setSelectedSpecialty(value);
-    const specialty = specialties.find((item) => item.name === value);
-    if (specialty && specialty.doctors.length) {
-      setSelectedDoctor(specialty.doctors[0].name);
+  const slotsForSelectedDate = useMemo(
+    () => availability.filter((slot) => slot.ScheduleDate === selectedDate),
+    [availability, selectedDate]
+  );
+
+  const activeDoctorDetails = useMemo(
+    () => doctors.find((doctor) => doctor.DoctorID === selectedDoctorId) || null,
+    [doctors, selectedDoctorId]
+  );
+
+  const nextAvailability = useMemo(() => {
+    if (availability.length > 0) {
+      return availability[0];
     }
+
+    if (activeDoctorDetails?.NextScheduleDate) {
+      return {
+        ScheduleDate: activeDoctorDetails.NextScheduleDate,
+        StartTime: activeDoctorDetails.NextStartTime,
+        EndTime: activeDoctorDetails.NextEndTime,
+      };
+    }
+
+    return null;
+  }, [availability, activeDoctorDetails]);
+
+  const handleDoctorChange = (event) => {
+    const value = Number.parseInt(event.target.value, 10);
+    setSelectedDoctorId(Number.isNaN(value) ? null : value);
+  };
+
+  const handleDateChange = (event) => {
+    setSelectedDate(event.target.value);
+  };
+
+  const handleTimeChange = (event) => {
+    setSelectedSlotId(event.target.value);
   };
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    const slot = availability.find((item) => String(item.AvailableTimeID) === selectedSlotId);
+    const doctorName = activeDoctorDetails?.FullName || 'the selected doctor';
+
+    if (!slot) {
+      setConfirmation('Please choose an available appointment time to continue.');
+      return;
+    }
+
     setConfirmation(
-      `Appointment request saved for ${selectedDoctor} on ${formatReadableDate(selectedDate)} at ${selectedTime}. Our care team will confirm shortly.`,
+      `Appointment request saved for ${doctorName} on ${formatReadableDate(
+        slot.ScheduleDate,
+      )} at ${formatTimeRange(slot.StartTime, slot.EndTime)}. Sign in as a patient to confirm.`
     );
     setTimeout(() => setConfirmation(''), 6000);
   };
@@ -127,81 +248,121 @@ function HomePage() {
           <form onSubmit={handleSubmit} className="mt-8 space-y-6">
             <div className="grid gap-5 sm:grid-cols-2">
               <label className="flex flex-col gap-2 text-sm font-medium text-slate-600">
-                Speciality
-                <select
-                  value={selectedSpecialty}
-                  onChange={handleSpecialtyChange}
-                  className="w-full rounded-2xl border border-emerald-100 bg-white/80 px-4 py-3 text-base text-brand-dark shadow-soft focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
-                >
-                  {specialties.map((item) => (
-                    <option key={item.name} value={item.name}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm font-medium text-slate-600">
                 Doctor
                 <select
-                  value={selectedDoctor}
-                  onChange={(event) => setSelectedDoctor(event.target.value)}
-                  className="w-full rounded-2xl border border-emerald-100 bg-white/80 px-4 py-3 text-base text-brand-dark shadow-soft focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
+                  value={selectedDoctorId ?? ''}
+                  onChange={handleDoctorChange}
+                  disabled={doctorsLoading || doctors.length === 0}
+                  className="w-full rounded-2xl border border-emerald-100 bg-white/80 px-4 py-3 text-base text-brand-dark shadow-soft focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/40 disabled:cursor-not-allowed disabled:bg-slate-100"
                 >
-                  {doctorsForSpecialty.map((doctor) => (
-                    <option key={doctor.name} value={doctor.name}>
-                      {doctor.name}
-                    </option>
-                  ))}
+                  {doctorsLoading ? (
+                    <option value="">Loading doctors...</option>
+                  ) : doctors.length === 0 ? (
+                    <option value="">No doctors available</option>
+                  ) : (
+                    doctors.map((doctor) => (
+                      <option key={doctor.DoctorID} value={doctor.DoctorID}>
+                        {doctor.FullName}
+                      </option>
+                    ))
+                  )}
                 </select>
               </label>
 
               <label className="flex flex-col gap-2 text-sm font-medium text-slate-600">
                 Date
-                <input
-                  type="date"
-                  min={today}
+                <select
                   value={selectedDate}
-                  onChange={(event) => setSelectedDate(event.target.value)}
-                  className="w-full rounded-2xl border border-emerald-100 bg-white/80 px-4 py-3 text-base text-brand-dark shadow-soft focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
-                />
+                  onChange={handleDateChange}
+                  disabled={availabilityLoading || availableDates.length === 0}
+                  className="w-full rounded-2xl border border-emerald-100 bg-white/80 px-4 py-3 text-base text-brand-dark shadow-soft focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/40 disabled:cursor-not-allowed disabled:bg-slate-100"
+                >
+                  {availabilityLoading ? (
+                    <option value="">Loading dates...</option>
+                  ) : availableDates.length === 0 ? (
+                    <option value="">No upcoming availability</option>
+                  ) : (
+                    availableDates.map((date) => (
+                      <option key={date} value={date}>
+                        {formatReadableDate(date)}
+                      </option>
+                    ))
+                  )}
+                </select>
               </label>
 
               <label className="flex flex-col gap-2 text-sm font-medium text-slate-600">
                 Time
                 <select
-                  value={selectedTime}
-                  onChange={(event) => setSelectedTime(event.target.value)}
-                  className="w-full rounded-2xl border border-emerald-100 bg-white/80 px-4 py-3 text-base text-brand-dark shadow-soft focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
+                  value={selectedSlotId}
+                  onChange={handleTimeChange}
+                  disabled={slotsForSelectedDate.length === 0}
+                  className="w-full rounded-2xl border border-emerald-100 bg-white/80 px-4 py-3 text-base text-brand-dark shadow-soft focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/40 disabled:cursor-not-allowed disabled:bg-slate-100"
                 >
-                  {appointmentTimes.map((time) => (
-                    <option key={time} value={time}>
-                      {time}
-                    </option>
-                  ))}
+                  {slotsForSelectedDate.length === 0 ? (
+                    <option value="">No time slots available</option>
+                  ) : (
+                    slotsForSelectedDate.map((slot) => (
+                      <option key={slot.AvailableTimeID} value={slot.AvailableTimeID}>
+                        {formatTimeRange(slot.StartTime, slot.EndTime)}
+                      </option>
+                    ))
+                  )}
                 </select>
               </label>
+
+              {doctorsError && (
+                <div className="sm:col-span-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+                  {doctorsError}
+                </div>
+              )}
+
+              {availabilityError && !availabilityLoading && (
+                <div className="sm:col-span-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700">
+                  {availabilityError}
+                </div>
+              )}
             </div>
 
             {activeDoctorDetails && (
               <div className="grid gap-4 rounded-3xl border border-brand-primary/20 bg-brand-secondary/60 p-6 text-sm text-brand-dark shadow-soft sm:grid-cols-2">
                 <div>
-                  <p className="font-semibold text-brand-dark">{activeDoctorDetails.name}</p>
-                  <p className="mt-1 text-slate-600">{activeDoctorDetails.location}</p>
+                  <p className="font-semibold text-brand-dark">{activeDoctorDetails.FullName}</p>
+                  <p className="mt-1 text-slate-600">
+                    {activeDoctorDetails.AvailableSlotCount > 0
+                      ? `${activeDoctorDetails.AvailableSlotCount} available time slot${
+                          activeDoctorDetails.AvailableSlotCount === 1 ? '' : 's'
+                        }`
+                      : 'No upcoming availability listed'}
+                  </p>
                 </div>
                 <div className="flex items-center justify-start sm:justify-end">
-                  <span className="rounded-full bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-brand-dark">
-                    Next availability · {activeDoctorDetails.nextAvailability}
-                  </span>
+                  {nextAvailability ? (
+                    <span className="rounded-full bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-brand-dark">
+                      Next availability · {formatReadableDate(nextAvailability.ScheduleDate)} ·{' '}
+                      {formatTimeLabel(nextAvailability.StartTime)}
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Availability information not yet published
+                    </span>
+                  )}
                 </div>
               </div>
             )}
 
             <button
               type="submit"
-              className="w-full rounded-full bg-brand-primary px-6 py-3 text-base font-semibold text-white shadow-soft transition hover:bg-brand-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+              disabled={
+                doctorsLoading ||
+                availabilityLoading ||
+                !selectedDoctorId ||
+                slotsForSelectedDate.length === 0 ||
+                !selectedSlotId
+              }
+              className="w-full rounded-full bg-brand-primary px-6 py-3 text-base font-semibold text-white shadow-soft transition hover:bg-brand-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              Reserve appointment
+              {doctorsLoading || availabilityLoading ? 'Loading...' : 'Reserve appointment'}
             </button>
 
             {confirmation && (
