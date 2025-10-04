@@ -3,23 +3,16 @@ const bcrypt = require('bcryptjs');
 const config = require('../config/env');
 const { findUserByEmail } = require('../services/userService');
 
-const SUPPORTED_ROLES = new Set(['admin', 'doctor', 'patient']);
-
-// Authenticates a user by role and issues a signed JWT.
+// Authenticates a user and issues a signed JWT using the stored role metadata.
 async function signIn(req, res) {
-  const { email, password, role } = req.body;
+  const { email, password } = req.body;
 
-  if (!email || !password || !role) {
-    return res.status(400).json({ message: 'Please provide email, password, and role.' });
-  }
-
-  const normalizedRole = role.toLowerCase();
-  if (!SUPPORTED_ROLES.has(normalizedRole)) {
-    return res.status(400).json({ message: 'Unsupported role supplied.' });
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Please provide both email and password.' });
   }
 
   const user = await findUserByEmail(email);
-  if (!user || user.role !== normalizedRole) {
+  if (!user) {
     return res.status(404).json({ message: 'User not found.' });
   }
 

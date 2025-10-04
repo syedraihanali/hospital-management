@@ -4,6 +4,7 @@ import HomePage from './pages/HomePage';
 import RegisterPage from './pages/RegisterPage';
 import PatientProfile from './pages/PatientProfile';
 import SignInPage from './pages/SignInPage';
+import SignInLandingPage from './pages/SignInLandingPage';
 import Header from './components/Header';
 import BookAppointmentPage from './pages/BookAppointmentPage';
 import StaffPortal from './pages/StaffPortal';
@@ -42,6 +43,10 @@ function App() {
             <Route path="/reports" element={<ReportsPage />} />
             <Route
               path="/signin"
+              element={!auth.token ? <SignInLandingPage /> : <Navigate to={defaultRedirect} />}
+            />
+            <Route
+              path="/signin/:role"
               element={!auth.token ? <SignInPage /> : <Navigate to={defaultRedirect} />}
             />
             <Route
@@ -50,7 +55,7 @@ function App() {
                 auth.token && auth.user?.role === 'patient' ? (
                   <BookAppointmentPage />
                 ) : (
-                  <Navigate to={auth.token ? defaultRedirect : '/signin'} />
+                  <Navigate to={auth.token ? defaultRedirect : '/signin/patient'} />
                 )
               }
             />
@@ -60,7 +65,7 @@ function App() {
                 auth.token && auth.user?.role === 'doctor' ? (
                   <StaffPortal />
                 ) : (
-                  <Navigate to={auth.token ? defaultRedirect : '/signin'} />
+                  <Navigate to={auth.token ? defaultRedirect : '/signin/doctor'} />
                 )
               }
             />
@@ -70,7 +75,7 @@ function App() {
                 auth.token && auth.user?.role === 'patient' ? (
                   <PatientProfile />
                 ) : (
-                  <Navigate to={auth.token ? defaultRedirect : '/signin'} />
+                  <Navigate to={auth.token ? defaultRedirect : '/signin/patient'} />
                 )
               }
             />
@@ -80,7 +85,7 @@ function App() {
                 auth.token && auth.user?.role === 'admin' ? (
                   <AdminDashboard />
                 ) : (
-                  <Navigate to={auth.token ? defaultRedirect : '/signin'} />
+                  <Navigate to={auth.token ? defaultRedirect : '/signin/admin'} />
                 )
               }
             />

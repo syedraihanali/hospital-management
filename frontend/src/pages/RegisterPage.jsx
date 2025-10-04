@@ -110,7 +110,7 @@ function RegisterPage() {
       .then(() => {
         setRegistrationSuccess(true);
         setTimeout(() => {
-          navigate('/signin');
+          navigate('/signin/patient');
         }, 2000);
       })
       .catch((err) => {
