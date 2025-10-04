@@ -85,7 +85,7 @@ function SignInPage() {
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) {
-          throw new Error(data.message || 'Sign-in failed');
+          throw new Error(data.error || data.message || 'Sign-in failed');
         }
         return data;
       })
@@ -163,6 +163,14 @@ function SignInPage() {
             </Link>
           </p>
         )}
+        {selectedRole === 'doctor' ? (
+          <p className="mt-4 text-center text-sm text-slate-600">
+            Want to practice with us?{' '}
+            <Link to="/apply-as-doctor" className="font-semibold text-brand-primary hover:text-brand-accent">
+              Apply as a doctor
+            </Link>
+          </p>
+        ) : null}
       </div>
     </div>
   );

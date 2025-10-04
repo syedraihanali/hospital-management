@@ -4,14 +4,6 @@ import { AuthContext } from '../AuthContext';
 import { FaBars, FaTimes } from 'react-icons/fa';
 import { useSiteSettings } from '../SiteSettingsContext';
 
-const navigationLinks = [
-  { label: 'Home', to: '/' },
-  { label: 'Book', to: '/book-appointment' },
-  { label: 'Services', to: '/services' },
-  { label: 'Get Reports', to: '/reports' },
-  { label: 'About Us', to: '/about-us' },
-];
-
 function Header() {
   const { auth, logout } = useContext(AuthContext);
   const { siteSettings } = useSiteSettings();
@@ -42,6 +34,38 @@ function Header() {
       case 'patient':
       default:
         return { path: '/myprofile', label: 'My Profile' };
+    }
+  }, [auth.user?.role]);
+
+  const navLinks = useMemo(() => {
+    switch (auth.user?.role) {
+      case 'patient':
+        return [
+          { label: 'Home', to: '/' },
+          { label: 'Book', to: '/book-appointment' },
+          { label: 'Services', to: '/services' },
+          { label: 'Get Reports', to: '/reports' },
+          { label: 'About Us', to: '/about-us' },
+        ];
+      case 'doctor':
+        return [
+          { label: 'Home', to: '/' },
+          { label: 'Services', to: '/services' },
+          { label: 'About Us', to: '/about-us' },
+        ];
+      case 'admin':
+        return [
+          { label: 'Home', to: '/' },
+          { label: 'Services', to: '/services' },
+          { label: 'About Us', to: '/about-us' },
+        ];
+      default:
+        return [
+          { label: 'Home', to: '/' },
+          { label: 'Book', to: '/book-appointment' },
+          { label: 'Services', to: '/services' },
+          { label: 'About Us', to: '/about-us' },
+        ];
     }
   }, [auth.user?.role]);
 
@@ -168,7 +192,7 @@ function Header() {
           </Link>
 
           <nav className="hidden items-center gap-1 lg:flex">
-            {navigationLinks.map((link) => (
+            {navLinks.map((link) => (
               <NavLink key={link.label} to={link.to} className={navLinkClasses}>
                 {link.label}
               </NavLink>
@@ -192,7 +216,7 @@ function Header() {
         <div className="mx-auto mt-3 max-w-6xl px-4 sm:px-6 lg:hidden">
           <div className="rounded-3xl border border-white/60 bg-white/90 p-6 shadow-glass backdrop-blur-xl">
             <nav className="flex flex-col gap-2">
-              {navigationLinks.map((link) => (
+              {navLinks.map((link) => (
                 <NavLink
                   key={link.label}
                   to={link.to}

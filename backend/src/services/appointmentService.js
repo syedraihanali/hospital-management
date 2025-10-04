@@ -8,7 +8,9 @@ async function getUpcomingAppointments(patientId) {
         d.FullName AS doctor,
         DATE_FORMAT(at.ScheduleDate, '%Y-%m-%d') AS date,
         TIME_FORMAT(at.StartTime, '%H:%i') AS startTime,
-        TIME_FORMAT(at.EndTime, '%H:%i') AS endTime
+        TIME_FORMAT(at.EndTime, '%H:%i') AS endTime,
+        a.Status,
+        a.Notes
       FROM appointments a
       JOIN doctors d ON a.DoctorID = d.DoctorID
       JOIN available_time at ON a.AvailableTimeID = at.AvailableTimeID
@@ -25,7 +27,9 @@ async function getAppointmentHistory(patientId) {
         a.AppointmentID,
         d.FullName AS doctor,
         DATE_FORMAT(at.ScheduleDate, '%Y-%m-%d') AS date,
-        TIME_FORMAT(at.StartTime, '%H:%i') AS time
+        TIME_FORMAT(at.StartTime, '%H:%i') AS time,
+        a.Status,
+        a.Notes
       FROM appointments a
       JOIN doctors d ON a.DoctorID = d.DoctorID
       JOIN available_time at ON a.AvailableTimeID = at.AvailableTimeID
@@ -43,7 +47,9 @@ async function getUpcomingAppointmentsForDoctor(doctorId) {
         p.FullName AS patient,
         DATE_FORMAT(at.ScheduleDate, '%Y-%m-%d') AS date,
         TIME_FORMAT(at.StartTime, '%H:%i') AS startTime,
-        TIME_FORMAT(at.EndTime, '%H:%i') AS endTime
+        TIME_FORMAT(at.EndTime, '%H:%i') AS endTime,
+        a.Status,
+        a.Notes
       FROM appointments a
       JOIN patients p ON a.PatientID = p.PatientID
       JOIN available_time at ON a.AvailableTimeID = at.AvailableTimeID
@@ -85,7 +91,8 @@ async function bookAppointment({ patientId, availableTimeId }) {
     }
 
     const [appointmentResult] = await connection.execute(
-      'INSERT INTO appointments (PatientID, DoctorID, AvailableTimeID) VALUES (?, ?, ?)',
+      `INSERT INTO appointments (PatientID, DoctorID, AvailableTimeID, Status)
+       VALUES (?, ?, ?, 'pending')`,
       [patientId, timeSlot.DoctorID, availableTimeId]
     );
 
@@ -103,10 +110,88 @@ async function bookAppointment({ patientId, availableTimeId }) {
   });
 }
 
+async function createAvailabilitySlots(doctorId, slots) {
+  if (!slots.length) {
+    return;
+  }
+
+  const values = slots.map(({ date, startTime, endTime }) => [doctorId, date, startTime, endTime]);
+  await execute(
+    `INSERT INTO available_time (DoctorID, ScheduleDate, StartTime, EndTime, IsAvailable)
+     VALUES ${values.map(() => '(?, ?, ?, ?, 1)').join(', ')}`,
+    values.flat()
+  );
+}
+
+async function listAppointmentsForDoctor(doctorId) {
+  return execute(
+    `SELECT
+        a.AppointmentID,
+        a.Status,
+        a.Notes,
+        a.CreatedAt,
+        p.PatientID,
+        p.FullName AS PatientName,
+        p.PhoneNumber,
+        DATE_FORMAT(at.ScheduleDate, '%Y-%m-%d') AS ScheduleDate,
+        TIME_FORMAT(at.StartTime, '%H:%i') AS StartTime,
+        TIME_FORMAT(at.EndTime, '%H:%i') AS EndTime
+     FROM appointments a
+     JOIN patients p ON a.PatientID = p.PatientID
+     JOIN available_time at ON a.AvailableTimeID = at.AvailableTimeID
+     WHERE a.DoctorID = ?
+     ORDER BY at.ScheduleDate DESC, at.StartTime DESC`,
+    [doctorId]
+  );
+}
+
+async function listAppointmentsForPatient(patientId) {
+  return execute(
+    `SELECT
+        a.AppointmentID,
+        a.Status,
+        a.Notes,
+        a.CreatedAt,
+        d.DoctorID,
+        d.FullName AS DoctorName,
+        DATE_FORMAT(at.ScheduleDate, '%Y-%m-%d') AS ScheduleDate,
+        TIME_FORMAT(at.StartTime, '%H:%i') AS StartTime,
+        TIME_FORMAT(at.EndTime, '%H:%i') AS EndTime
+     FROM appointments a
+     JOIN doctors d ON a.DoctorID = d.DoctorID
+     JOIN available_time at ON a.AvailableTimeID = at.AvailableTimeID
+     WHERE a.PatientID = ?
+     ORDER BY at.ScheduleDate DESC, at.StartTime DESC`,
+    [patientId]
+  );
+}
+
+async function updateAppointmentStatus(appointmentId, status, notes = null) {
+  await execute(
+    `UPDATE appointments SET Status = ?, Notes = ?, UpdatedAt = CURRENT_TIMESTAMP WHERE AppointmentID = ?`,
+    [status, notes, appointmentId]
+  );
+}
+
+async function getAppointmentById(appointmentId) {
+  const appointments = await execute('SELECT * FROM appointments WHERE AppointmentID = ?', [appointmentId]);
+  return appointments[0];
+}
+
+async function reopenAvailabilitySlot(availableTimeId) {
+  await execute('UPDATE available_time SET IsAvailable = 1 WHERE AvailableTimeID = ?', [availableTimeId]);
+}
+
 module.exports = {
   getUpcomingAppointments,
   getAppointmentHistory,
   getAvailableTimes,
   bookAppointment,
   getUpcomingAppointmentsForDoctor,
+  createAvailabilitySlots,
+  listAppointmentsForDoctor,
+  listAppointmentsForPatient,
+  updateAppointmentStatus,
+  getAppointmentById,
+  reopenAvailabilitySlot,
 };

@@ -1,8 +1,4 @@
-const {
-  getAvailableTimes,
-  bookAppointment,
-} = require('../services/appointmentService');
-const { getDoctorIdForPatient } = require('../services/patientService');
+const { getAvailableTimes, bookAppointment } = require('../services/appointmentService');
 
 // Lists available appointment slots for the authenticated patient.
 async function getAvailableTimesForPatient(req, res) {
@@ -10,11 +6,11 @@ async function getAvailableTimesForPatient(req, res) {
     return res.status(403).json({ error: 'Only patients can view available times.' });
   }
 
-  const patientId = req.user.id;
-  const doctorId = await getDoctorIdForPatient(patientId);
+  const doctorIdParam = req.query.doctorId;
+  const doctorId = Number.parseInt(doctorIdParam, 10);
 
-  if (!doctorId) {
-    return res.status(400).json({ error: 'No doctor assigned to the patient.' });
+  if (Number.isNaN(doctorId)) {
+    return res.status(400).json({ error: 'A valid doctorId query parameter is required.' });
   }
 
   const availableTimes = await getAvailableTimes(doctorId);
@@ -29,12 +25,13 @@ async function bookAppointmentForPatient(req, res) {
 
   const patientId = req.user.id;
   const { availableTimeID } = req.body;
+  const slotId = Number.parseInt(availableTimeID, 10);
 
-  if (!availableTimeID) {
+  if (Number.isNaN(slotId)) {
     return res.status(400).json({ error: 'availableTimeID is required.' });
   }
 
-  const appointment = await bookAppointment({ patientId, availableTimeId: availableTimeID });
+  const appointment = await bookAppointment({ patientId, availableTimeId: slotId });
 
   return res.json({
     message: 'Appointment booked successfully',
@@ -44,6 +41,7 @@ async function bookAppointmentForPatient(req, res) {
       ScheduleDate: appointment.scheduleDate,
       StartTime: appointment.startTime,
       EndTime: appointment.endTime,
+      Status: 'pending',
     },
   });
 }

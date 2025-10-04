@@ -10,6 +10,8 @@ const defaultSiteSettings = {
   emergencyContactEmail: 'emergency@destinationhealth.com',
   emergencyContactAddress: '221B Harbor Street, Seattle, WA',
   footerNote: 'Secured with HIPAA-compliant infrastructure.',
+  supportPhone: '+8801711000000',
+  supportWhatsappUrl: 'https://wa.me/8801711000000',
 };
 
 export const SiteSettingsContext = createContext({
