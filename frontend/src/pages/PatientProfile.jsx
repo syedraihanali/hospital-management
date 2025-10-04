@@ -1,187 +1,544 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { AuthContext } from '../AuthContext';
+import { FaCalendarCheck, FaDownload, FaFileMedical, FaPrescriptionBottle } from 'react-icons/fa';
 
 function PatientProfile() {
   const { auth } = useContext(AuthContext);
-  const [patient, setPatient] = useState(null);
-  const [upcomingAppointments, setUpcomingAppointments] = useState([]);
-  const [appointmentHistory, setAppointmentHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const apiBaseUrl = (process.env.REACT_APP_API_URL || '').replace(/\/$/, '');
+  const patientId = auth.user?.id;
 
-  useEffect(() => {
-    const fetchPatientData = async () => {
-      try {
-        const patientResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/patients/${auth.user.id}`, {
+  const [profile, setProfile] = useState(null);
+  const [timeline, setTimeline] = useState({ appointments: [], documents: [], reports: [] });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [profileForm, setProfileForm] = useState(null);
+  const [profileFeedback, setProfileFeedback] = useState(null);
+  const [docFeedback, setDocFeedback] = useState(null);
+  const [passwordFeedback, setPasswordFeedback] = useState(null);
+  const [passwordValue, setPasswordValue] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortOrder, setSortOrder] = useState('desc');
+
+  const fetchProfileAndTimeline = async () => {
+    if (!patientId || !auth.token) {
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const [profileRes, timelineRes] = await Promise.all([
+        fetch(`${apiBaseUrl}/api/patients/${patientId}`, {
           headers: {
             Authorization: `Bearer ${auth.token}`,
           },
-        });
-
-        if (!patientResponse.ok) {
-          throw new Error('Failed to fetch patient data');
-        }
-
-        const patientData = await patientResponse.json();
-        setPatient(patientData);
-
-        const upcomingResponse = await fetch(
-          `${process.env.REACT_APP_API_URL}/api/patients/${auth.user.id}/upcomingAppointments`,
-          {
-            headers: {
-              Authorization: `Bearer ${auth.token}`,
-            },
+        }),
+        fetch(`${apiBaseUrl}/api/patients/${patientId}/timeline`, {
+          headers: {
+            Authorization: `Bearer ${auth.token}`,
           },
-        );
+        }),
+      ]);
 
-        if (!upcomingResponse.ok) {
-          throw new Error('Failed to fetch upcoming appointments');
-        }
-
-        const upcomingData = await upcomingResponse.json();
-        setUpcomingAppointments(upcomingData);
-
-        const historyResponse = await fetch(
-          `${process.env.REACT_APP_API_URL}/api/patients/${auth.user.id}/appointmentHistory`,
-          {
-            headers: {
-              Authorization: `Bearer ${auth.token}`,
-            },
-          },
-        );
-
-        if (!historyResponse.ok) {
-          throw new Error('Failed to fetch appointment history');
-        }
-
-        const historyData = await historyResponse.json();
-        setAppointmentHistory(historyData);
-
-        setLoading(false);
-      } catch (err) {
-        console.error('Error fetching patient data:', err);
-        setError('Failed to fetch data. Please try again later.');
-        setLoading(false);
+      if (!profileRes.ok) {
+        throw new Error('Unable to load patient profile.');
       }
-    };
+      if (!timelineRes.ok) {
+        throw new Error('Unable to load medical history.');
+      }
 
-    fetchPatientData();
-  }, [auth.user.id, auth.token]);
+      const profileData = await profileRes.json();
+      const timelineData = await timelineRes.json();
+      setProfile(profileData);
+      setTimeline({
+        appointments: Array.isArray(timelineData.appointments) ? timelineData.appointments : [],
+        documents: Array.isArray(timelineData.documents) ? timelineData.documents : [],
+        reports: Array.isArray(timelineData.reports) ? timelineData.reports : [],
+      });
+      setProfileForm({
+        fullName: profileData.FullName || '',
+        phoneNumber: profileData.PhoneNumber || '',
+        email: profileData.Email || '',
+        address: profileData.Address || '',
+        nidNumber: profileData.NidNumber || '',
+        avatarUrl: profileData.AvatarUrl || '',
+        avatarFile: null,
+      });
+    } catch (err) {
+      setError(err.message || 'Failed to load your dashboard.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refreshTimeline = async () => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/patients/${patientId}/timeline`, {
+        headers: {
+          Authorization: `Bearer ${auth.token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error('Unable to refresh history.');
+      }
+      const data = await response.json();
+      setTimeline({
+        appointments: Array.isArray(data.appointments) ? data.appointments : [],
+        documents: Array.isArray(data.documents) ? data.documents : [],
+        reports: Array.isArray(data.reports) ? data.reports : [],
+      });
+    } catch (err) {
+      setError(err.message || 'Failed to refresh history.');
+    }
+  };
+
+  useEffect(() => {
+    fetchProfileAndTimeline();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patientId]);
+
+  const combinedEntries = useMemo(() => {
+    const entries = [];
+
+    timeline.appointments.forEach((appointment) => {
+      const appointmentDate = new Date(`${appointment.ScheduleDate}T${appointment.StartTime || '00:00'}`);
+      entries.push({
+        id: `appointment-${appointment.AppointmentID}`,
+        type: 'appointment',
+        title: `Appointment with ${appointment.DoctorName}`,
+        subtitle: `Status: ${appointment.Status?.toUpperCase()}`,
+        description: appointment.Notes || '',
+        date: appointmentDate,
+      });
+    });
+
+    timeline.documents.forEach((document) => {
+      const uploadedAt = document.UploadedAt ? new Date(document.UploadedAt) : new Date();
+      entries.push({
+        id: `document-${document.DocumentID}`,
+        type: 'document',
+        title: document.DocumentName,
+        subtitle: 'Uploaded medical record',
+        url: document.FileUrl,
+        date: uploadedAt,
+      });
+    });
+
+    timeline.reports.forEach((report) => {
+      const createdAt = report.CreatedAt ? new Date(report.CreatedAt) : new Date();
+      entries.push({
+        id: `report-${report.ReportID}`,
+        type: 'report',
+        title: report.Title,
+        subtitle: report.DoctorName ? `Doctor: ${report.DoctorName}` : 'Doctor report',
+        description: report.Description || '',
+        url: report.FileUrl,
+        date: createdAt,
+      });
+    });
+
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    const filtered = normalizedSearch
+      ? entries.filter((entry) =>
+          [entry.title, entry.subtitle, entry.description]
+            .filter(Boolean)
+            .some((value) => value.toLowerCase().includes(normalizedSearch))
+        )
+      : entries;
+
+    return filtered.sort((a, b) =>
+      sortOrder === 'asc' ? a.date.getTime() - b.date.getTime() : b.date.getTime() - a.date.getTime()
+    );
+  }, [timeline, searchTerm, sortOrder]);
+
+  const handleProfileInputChange = (event) => {
+    const { name, value } = event.target;
+    setProfileForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleAvatarChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    setProfileForm((prev) => ({ ...prev, avatarFile: file }));
+  };
+
+  const handleProfileSubmit = async (event) => {
+    event.preventDefault();
+    setProfileFeedback(null);
+
+    try {
+      const payload = new FormData();
+      payload.append('fullName', profileForm.fullName);
+      payload.append('phoneNumber', profileForm.phoneNumber);
+      payload.append('email', profileForm.email);
+      payload.append('address', profileForm.address);
+      payload.append('nidNumber', profileForm.nidNumber);
+      if (profileForm.avatarFile) {
+        payload.append('avatar', profileForm.avatarFile);
+      }
+
+      const response = await fetch(`${apiBaseUrl}/api/patients/${patientId}/profile`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${auth.token}`,
+        },
+        body: payload,
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || data.message || 'Unable to update profile.');
+      }
+
+      setProfileFeedback({ type: 'success', message: 'Profile updated successfully.' });
+      await fetchProfileAndTimeline();
+    } catch (err) {
+      setProfileFeedback({ type: 'error', message: err.message || 'Failed to update profile.' });
+    }
+  };
+
+  const handleDocumentUpload = async (event) => {
+    event.preventDefault();
+    setDocFeedback(null);
+
+    const file = event.target.elements.document?.files?.[0];
+    if (!file) {
+      setDocFeedback({ type: 'error', message: 'Choose a document to upload.' });
+      return;
+    }
+
+    try {
+      const payload = new FormData();
+      payload.append('document', file);
+
+      const response = await fetch(`${apiBaseUrl}/api/patients/${patientId}/documents`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${auth.token}`,
+        },
+        body: payload,
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || data.message || 'Unable to upload document.');
+      }
+
+      event.target.reset();
+      setDocFeedback({ type: 'success', message: 'Document uploaded successfully.' });
+      await refreshTimeline();
+    } catch (err) {
+      setDocFeedback({ type: 'error', message: err.message || 'Failed to upload document.' });
+    }
+  };
+
+  const handlePasswordSubmit = async (event) => {
+    event.preventDefault();
+    setPasswordFeedback(null);
+
+    if (!passwordValue || passwordValue.length < 8) {
+      setPasswordFeedback({ type: 'error', message: 'Password must be at least 8 characters long.' });
+      return;
+    }
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/patients/${patientId}/password`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${auth.token}`,
+        },
+        body: JSON.stringify({ newPassword: passwordValue }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || data.message || 'Unable to update password.');
+      }
+
+      setPasswordValue('');
+      setPasswordFeedback({ type: 'success', message: 'Password updated successfully.' });
+    } catch (err) {
+      setPasswordFeedback({ type: 'error', message: err.message || 'Failed to update password.' });
+    }
+  };
 
   if (loading) {
-    return <div className="flex min-h-[calc(100vh-7rem)] items-center justify-center text-slate-600">Loading patient data...</div>;
+    return (
+      <div className="flex min-h-[calc(100vh-7rem)] items-center justify-center text-slate-600">
+        Loading your dashboard...
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="flex min-h-[calc(100vh-7rem)] items-center justify-center text-red-600">{error}</div>;
+    return (
+      <div className="flex min-h-[calc(100vh-7rem)] items-center justify-center text-red-600">
+        {error}
+      </div>
+    );
   }
 
-  if (!patient) {
-    return <div className="flex min-h-[calc(100vh-7rem)] items-center justify-center text-slate-600">No patient data available.</div>;
+  if (!profile || !profileForm) {
+    return (
+      <div className="flex min-h-[calc(100vh-7rem)] items-center justify-center text-slate-500">
+        No patient data available.
+      </div>
+    );
   }
-
-  const tableCellClasses = 'border-b border-slate-200 px-4 py-3 text-sm text-slate-700';
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 pb-12">
-      <header className="text-center">
-        <h1 className="text-3xl font-semibold text-slate-900">Welcome back, {patient.FullName}</h1>
-        <h2 className="mt-2 text-lg text-slate-600">Welcome to Destination Health. How can we help you today?</h2>
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 pb-14">
+      <header className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card backdrop-blur md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-emerald-100 bg-brand-secondary text-2xl font-semibold text-brand-dark">
+            {profileForm.avatarUrl ? (
+              <img src={profileForm.avatarUrl} alt={profileForm.fullName} className="h-full w-full object-cover" />
+            ) : (
+              profileForm.fullName.charAt(0).toUpperCase()
+            )}
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-900">Welcome back, {profile.FullName}</h1>
+            <p className="text-sm text-slate-600">Stay on top of appointments, prescriptions, and your medical history.</p>
+          </div>
+        </div>
+        <div className="grid gap-1 text-sm text-slate-600">
+          <span>Email: {profile.Email}</span>
+          <span>Phone: {profile.PhoneNumber}</span>
+          <span>NID: {profile.NidNumber}</span>
+        </div>
       </header>
 
-      <section className="grid gap-6 lg:grid-cols-2">
-        <article className="rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-card backdrop-blur">
-          <h3 className="text-xl font-semibold text-brand-primary">Your Details</h3>
-          <dl className="mt-4 space-y-3 text-sm text-slate-700">
-            <div className="flex items-start justify-between gap-4">
-              <dt className="font-semibold text-slate-900">Full Name</dt>
-              <dd>{patient.FullName}</dd>
+      <section className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+        <article className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card backdrop-blur">
+          <h2 className="text-xl font-semibold text-brand-primary">Update profile</h2>
+          {profileFeedback ? (
+            <div
+              className={`mt-4 rounded-xl border px-4 py-3 text-sm ${
+                profileFeedback.type === 'success'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-rose-200 bg-rose-50 text-rose-700'
+              }`}
+            >
+              {profileFeedback.message}
             </div>
-            <div className="flex items-start justify-between gap-4">
-              <dt className="font-semibold text-slate-900">Email</dt>
-              <dd>{patient.Email}</dd>
+          ) : null}
+          <form className="mt-4 grid gap-4" onSubmit={handleProfileSubmit}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="flex flex-col text-sm font-medium text-slate-700">
+                Full name
+                <input
+                  type="text"
+                  name="fullName"
+                  value={profileForm.fullName}
+                  onChange={handleProfileInputChange}
+                  required
+                  className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                />
+              </label>
+              <label className="flex flex-col text-sm font-medium text-slate-700">
+                Mobile number
+                <input
+                  type="tel"
+                  name="phoneNumber"
+                  value={profileForm.phoneNumber}
+                  onChange={handleProfileInputChange}
+                  required
+                  className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                />
+              </label>
+              <label className="flex flex-col text-sm font-medium text-slate-700">
+                Email address
+                <input
+                  type="email"
+                  name="email"
+                  value={profileForm.email}
+                  onChange={handleProfileInputChange}
+                  required
+                  className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                />
+              </label>
+              <label className="flex flex-col text-sm font-medium text-slate-700">
+                National ID
+                <input
+                  type="text"
+                  name="nidNumber"
+                  value={profileForm.nidNumber}
+                  onChange={handleProfileInputChange}
+                  required
+                  className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                />
+              </label>
             </div>
-            <div className="flex items-start justify-between gap-4">
-              <dt className="font-semibold text-slate-900">Phone Number</dt>
-              <dd>{patient.PhoneNumber}</dd>
-            </div>
-            <div className="flex items-start justify-between gap-4">
-              <dt className="font-semibold text-slate-900">Birth Date</dt>
-              <dd>{patient.BirthDate}</dd>
-            </div>
-            <div className="flex items-start justify-between gap-4">
-              <dt className="font-semibold text-slate-900">Address</dt>
-              <dd className="text-right">{patient.Address}</dd>
-            </div>
-            <div className="flex items-start justify-between gap-4">
-              <dt className="font-semibold text-slate-900">Gender</dt>
-              <dd>{patient.Gender}</dd>
-            </div>
-          </dl>
+            <label className="flex flex-col text-sm font-medium text-slate-700">
+              Address
+              <input
+                type="text"
+                name="address"
+                value={profileForm.address}
+                onChange={handleProfileInputChange}
+                required
+                className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+              />
+            </label>
+            <label className="flex flex-col text-sm font-medium text-slate-700">
+              Update profile picture
+              <input
+                type="file"
+                accept=".jpg,.jpeg,.png"
+                onChange={handleAvatarChange}
+                className="mt-1 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+              />
+            </label>
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center rounded-full bg-brand-primary px-6 py-3 text-sm font-semibold text-white shadow hover:bg-brand-dark"
+            >
+              Save profile
+            </button>
+          </form>
         </article>
 
-        <article className="rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-card backdrop-blur">
-          <h3 className="text-xl font-semibold text-brand-primary">Upcoming Appointments</h3>
-          <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
-              <thead className="bg-slate-100 text-left text-slate-700">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Doctor</th>
-                  <th className="px-4 py-3 font-semibold">Date</th>
-                  <th className="px-4 py-3 font-semibold">Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                {upcomingAppointments && upcomingAppointments.length > 0 ? (
-                  upcomingAppointments.map((appointment) => (
-                    <tr key={appointment.AppointmentID} className="odd:bg-white even:bg-slate-50">
-                      <td className={tableCellClasses}>{appointment.doctor}</td>
-                      <td className={tableCellClasses}>{appointment.date}</td>
-                      <td className={tableCellClasses}>{`${appointment.startTime} - ${appointment.endTime}`}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td className="px-4 py-4 text-center text-sm text-slate-500" colSpan="3">
-                      No upcoming appointments.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+        <article className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card backdrop-blur">
+          <h2 className="text-xl font-semibold text-brand-primary">Account security</h2>
+          {passwordFeedback ? (
+            <div
+              className={`mt-4 rounded-xl border px-4 py-3 text-sm ${
+                passwordFeedback.type === 'success'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-rose-200 bg-rose-50 text-rose-700'
+              }`}
+            >
+              {passwordFeedback.message}
+            </div>
+          ) : null}
+          <form className="mt-4 grid gap-4" onSubmit={handlePasswordSubmit}>
+            <label className="flex flex-col text-sm font-medium text-slate-700">
+              New password
+              <input
+                type="password"
+                value={passwordValue}
+                onChange={(event) => setPasswordValue(event.target.value)}
+                minLength={8}
+                required
+                className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+              />
+            </label>
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow hover:bg-slate-700"
+            >
+              Change password
+            </button>
+          </form>
+
+          <div className="mt-8 border-t border-slate-200 pt-6">
+            <h3 className="text-lg font-semibold text-brand-primary">Upload additional records</h3>
+            {docFeedback ? (
+              <div
+                className={`mt-3 rounded-xl border px-4 py-3 text-sm ${
+                  docFeedback.type === 'success'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : 'border-rose-200 bg-rose-50 text-rose-700'
+                }`}
+              >
+                {docFeedback.message}
+              </div>
+            ) : null}
+            <form className="mt-3 grid gap-3" onSubmit={handleDocumentUpload}>
+              <input
+                type="file"
+                name="document"
+                accept=".pdf,.jpg,.jpeg,.png"
+                className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+              />
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-full bg-brand-primary px-6 py-2 text-sm font-semibold text-white shadow hover:bg-brand-dark"
+              >
+                Upload document
+              </button>
+            </form>
           </div>
         </article>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-card backdrop-blur">
-        <h3 className="text-xl font-semibold text-brand-primary">Appointment History</h3>
-        <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-100 text-left text-slate-700">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Doctor</th>
-                <th className="px-4 py-3 font-semibold">Date</th>
-                <th className="px-4 py-3 font-semibold">Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {appointmentHistory && appointmentHistory.length > 0 ? (
-                appointmentHistory.map((appointment) => (
-                  <tr key={appointment.AppointmentID} className="odd:bg-white even:bg-slate-50">
-                    <td className={tableCellClasses}>{appointment.doctor}</td>
-                    <td className={tableCellClasses}>{appointment.date}</td>
-                    <td className={tableCellClasses}>{appointment.time}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td className="px-4 py-4 text-center text-sm text-slate-500" colSpan="3">
-                    No appointment history.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      <section className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card backdrop-blur">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-brand-primary">Timeline & records</h2>
+            <p className="text-sm text-slate-600">Search across appointments, uploaded documents, and doctor reports.</p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <input
+              type="search"
+              placeholder="Search by doctor or title"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              className="rounded-full border border-slate-300 px-4 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+            />
+            <select
+              value={sortOrder}
+              onChange={(event) => setSortOrder(event.target.value)}
+              className="rounded-full border border-slate-300 px-4 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+            >
+              <option value="desc">Newest first</option>
+              <option value="asc">Oldest first</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-4">
+          {combinedEntries.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
+              No records found. Upload documents or book an appointment to get started.
+            </div>
+          ) : (
+            combinedEntries.map((entry) => (
+              <article
+                key={entry.id}
+                className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/90 px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 flex h-12 w-12 items-center justify-center rounded-full bg-brand-secondary text-brand-primary">
+                    {entry.type === 'appointment' ? (
+                      <FaCalendarCheck aria-hidden="true" />
+                    ) : entry.type === 'report' ? (
+                      <FaPrescriptionBottle aria-hidden="true" />
+                    ) : (
+                      <FaFileMedical aria-hidden="true" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-900">{entry.title}</h3>
+                    <p className="text-xs text-slate-600">{entry.subtitle}</p>
+                    {entry.description ? <p className="mt-1 text-xs text-slate-500">{entry.description}</p> : null}
+                    <p className="mt-1 text-xs text-slate-400">
+                      {entry.date.toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
+                </div>
+                {entry.url ? (
+                  <a
+                    href={entry.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 self-start rounded-full border border-brand-primary px-4 py-2 text-xs font-semibold text-brand-primary transition hover:bg-brand-primary hover:text-white"
+                  >
+                    <FaDownload aria-hidden="true" /> Download
+                  </a>
+                ) : null}
+              </article>
+            ))
+          )}
         </div>
       </section>
     </div>

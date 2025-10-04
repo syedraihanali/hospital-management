@@ -2,7 +2,11 @@ const { Router } = require('express');
 const asyncHandler = require('../utils/asyncHandler');
 const authenticateToken = require('../middleware/authenticate');
 const authorizeRoles = require('../middleware/authorizeRoles');
-const { getOverview } = require('../controllers/adminController');
+const {
+  getOverview,
+  getDoctorApplications,
+  reviewDoctorApplicationHandler,
+} = require('../controllers/adminController');
 const {
   fetchAboutContent,
   saveAboutContent,
@@ -17,6 +21,18 @@ const {
 const router = Router();
 
 router.get('/overview', authenticateToken, authorizeRoles('admin'), asyncHandler(getOverview));
+router.get(
+  '/doctor-applications',
+  authenticateToken,
+  authorizeRoles('admin'),
+  asyncHandler(getDoctorApplications)
+);
+router.post(
+  '/doctor-applications/:id/review',
+  authenticateToken,
+  authorizeRoles('admin'),
+  asyncHandler(reviewDoctorApplicationHandler)
+);
 router.get(
   '/content/about',
   authenticateToken,

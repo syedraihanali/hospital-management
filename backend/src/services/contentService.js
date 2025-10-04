@@ -26,6 +26,8 @@ const defaultSiteSettings = {
   emergencyContactEmail: 'emergency@destinationhealth.com',
   emergencyContactAddress: '221B Harbor Street, Seattle, WA',
   footerNote: 'Secured with HIPAA-compliant infrastructure.',
+  supportPhone: '+8801711000000',
+  supportWhatsappUrl: 'https://wa.me/8801711000000',
 };
 
 function normalizeAboutContent(content = {}) {
@@ -74,6 +76,9 @@ function normalizeSiteSettings(settings = {}) {
     emergencyContactAddress:
       normalizeStrings(settings.emergencyContactAddress) || defaultSiteSettings.emergencyContactAddress,
     footerNote: normalizeStrings(settings.footerNote) || defaultSiteSettings.footerNote,
+    supportPhone: normalizeStrings(settings.supportPhone) || defaultSiteSettings.supportPhone,
+    supportWhatsappUrl:
+      normalizeStrings(settings.supportWhatsappUrl) || defaultSiteSettings.supportWhatsappUrl,
   };
 }
 

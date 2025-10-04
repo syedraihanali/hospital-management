@@ -10,14 +10,16 @@ async function createPatient({
   email,
   password,
   address,
-  doctorId,
+  nidNumber,
+  doctorId = null,
+  documents = [],
 }) {
   const passwordHash = await bcrypt.hash(password, 10);
   return transaction(async (connection) => {
     const [patientResult] = await connection.execute(
-      `INSERT INTO patients (FullName, BirthDate, PhoneNumber, Email, Gender, PasswordHash, Address, DoctorID)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [fullName, birthDate, phoneNumber, email, gender, passwordHash, address, doctorId]
+      `INSERT INTO patients (FullName, BirthDate, PhoneNumber, Email, Gender, PasswordHash, NidNumber, Address, DoctorID)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [fullName, birthDate, phoneNumber, email, gender, passwordHash, nidNumber, address, doctorId]
     );
 
     const patientId = patientResult.insertId;
@@ -28,6 +30,14 @@ async function createPatient({
       [email, passwordHash, patientId]
     );
 
+    if (documents.length) {
+      const values = documents.map(({ name, url }) => [patientId, name, url]);
+      await connection.query(
+        'INSERT INTO patient_documents (PatientID, DocumentName, FileUrl) VALUES ?',
+        [values]
+      );
+    }
+
     return { id: patientId, fullName, email };
   });
 }
@@ -35,7 +45,7 @@ async function createPatient({
 // Returns the full list of patients.
 async function listPatients() {
   return execute(
-    `SELECT PatientID, FullName, BirthDate, PhoneNumber, Email, Gender, Address, DoctorID
+    `SELECT PatientID, FullName, BirthDate, PhoneNumber, Email, Gender, Address, DoctorID, NidNumber, AvatarUrl
      FROM patients`
   );
 }
@@ -43,7 +53,7 @@ async function listPatients() {
 // Retrieves a patient by identifier.
 async function findPatientById(id) {
   const patients = await execute(
-    `SELECT PatientID, FullName, BirthDate, PhoneNumber, Email, Gender, Address, DoctorID
+    `SELECT PatientID, FullName, BirthDate, PhoneNumber, Email, Gender, Address, DoctorID, NidNumber, AvatarUrl
      FROM patients WHERE PatientID = ?`,
     [id]
   );
@@ -56,9 +66,63 @@ async function getDoctorIdForPatient(patientId) {
   return patients[0]?.DoctorID;
 }
 
+async function listPatientDocuments(patientId, { search = '', sort = 'desc' } = {}) {
+  const order = sort === 'asc' ? 'ASC' : 'DESC';
+  const like = `%${search}%`;
+  return execute(
+    `SELECT DocumentID, DocumentName, FileUrl, UploadedAt
+     FROM patient_documents
+     WHERE PatientID = ? AND DocumentName LIKE ?
+     ORDER BY UploadedAt ${order}`,
+    [patientId, like]
+  );
+}
+
+async function listPatientReports(patientId, { search = '', sort = 'desc' } = {}) {
+  const order = sort === 'asc' ? 'ASC' : 'DESC';
+  const like = `%${search}%`;
+  return execute(
+    `SELECT r.ReportID, r.Title, r.Description, r.FileUrl, r.CreatedAt, d.FullName AS DoctorName
+     FROM doctor_reports r
+     JOIN doctors d ON r.DoctorID = d.DoctorID
+     WHERE r.PatientID = ? AND (r.Title LIKE ? OR r.Description LIKE ?)
+     ORDER BY r.CreatedAt ${order}`,
+    [patientId, like, like]
+  );
+}
+
+async function savePatientDocument(patientId, name, url) {
+  await execute(
+    `INSERT INTO patient_documents (PatientID, DocumentName, FileUrl)
+     VALUES (?, ?, ?)`,
+    [patientId, name, url]
+  );
+}
+
+async function updatePatientProfile(patientId, { fullName, phoneNumber, email, address, nidNumber, avatarUrl }) {
+  await execute(
+    `UPDATE patients
+     SET FullName = ?, PhoneNumber = ?, Email = ?, Address = ?, NidNumber = ?, AvatarUrl = ?
+     WHERE PatientID = ?`,
+    [fullName, phoneNumber, email, address, nidNumber, avatarUrl, patientId]
+  );
+  await execute('UPDATE users SET Email = ? WHERE PatientID = ?', [email, patientId]);
+}
+
+async function updatePatientPassword(patientId, password) {
+  const hash = await bcrypt.hash(password, 10);
+  await execute('UPDATE patients SET PasswordHash = ? WHERE PatientID = ?', [hash, patientId]);
+  await execute('UPDATE users SET PasswordHash = ? WHERE PatientID = ?', [hash, patientId]);
+}
+
 module.exports = {
   createPatient,
   listPatients,
   findPatientById,
   getDoctorIdForPatient,
+  listPatientDocuments,
+  listPatientReports,
+  savePatientDocument,
+  updatePatientProfile,
+  updatePatientPassword,
 };

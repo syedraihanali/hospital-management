@@ -10,6 +10,9 @@ async function ensureSchema() {
   await createUsersTable();
   await createAvailabilityTable();
   await createAppointmentsTable();
+  await createDoctorApplicationsTable();
+  await createPatientDocumentsTable();
+  await createDoctorReportsTable();
   await createSiteContentTable();
   await createServicePackagesTable();
   await createServicePackageItemsTable();
@@ -19,6 +22,18 @@ async function ensureSchema() {
   await migrateMissingPatientUsers();
   await seedAdminUser();
   await seedDoctorUsers();
+  await seedPatientsWithHistory();
+}
+
+async function addColumnIfMissing(table, column, definition) {
+  const columns = await execute(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+    [table, column]
+  );
+
+  if (!columns.length) {
+    await execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
 }
 
 async function createDoctorsTable() {
@@ -27,9 +42,18 @@ async function createDoctorsTable() {
       DoctorID INT PRIMARY KEY AUTO_INCREMENT,
       FullName VARCHAR(255) NOT NULL,
       MaxPatientNumber INT NOT NULL,
-      CurrentPatientNumber INT NOT NULL DEFAULT 0
+      CurrentPatientNumber INT NOT NULL DEFAULT 0,
+      Email VARCHAR(255) NULL,
+      PhoneNumber VARCHAR(50) NULL,
+      Specialization VARCHAR(255) NULL,
+      AvatarUrl TEXT NULL
     )`
   );
+
+  await addColumnIfMissing('doctors', 'Email', 'VARCHAR(255) NULL');
+  await addColumnIfMissing('doctors', 'PhoneNumber', 'VARCHAR(50) NULL');
+  await addColumnIfMissing('doctors', 'Specialization', 'VARCHAR(255) NULL');
+  await addColumnIfMissing('doctors', 'AvatarUrl', 'TEXT NULL');
 }
 
 async function createPatientsTable() {
@@ -42,6 +66,8 @@ async function createPatientsTable() {
       Email VARCHAR(255) NOT NULL UNIQUE,
       Gender ENUM('Male', 'Female', 'Other', 'Prefer not to say') NOT NULL,
       PasswordHash VARCHAR(255) NOT NULL,
+      NidNumber VARCHAR(100) NOT NULL,
+      AvatarUrl TEXT NULL,
       Address VARCHAR(255) NOT NULL,
       DoctorID INT NULL,
       FOREIGN KEY (DoctorID) REFERENCES doctors(DoctorID)
@@ -49,6 +75,9 @@ async function createPatientsTable() {
         ON DELETE SET NULL
     )`
   );
+
+  await addColumnIfMissing('patients', 'NidNumber', 'VARCHAR(100) NOT NULL DEFAULT ""');
+  await addColumnIfMissing('patients', 'AvatarUrl', 'TEXT NULL');
 }
 
 async function createAdminsTable() {
@@ -107,6 +136,10 @@ async function createAppointmentsTable() {
       PatientID INT NOT NULL,
       DoctorID INT NOT NULL,
       AvailableTimeID INT NOT NULL,
+      Status ENUM('pending', 'confirmed', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',
+      Notes TEXT NULL,
+      CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       FOREIGN KEY (PatientID) REFERENCES patients(PatientID)
         ON UPDATE CASCADE
         ON DELETE CASCADE,
@@ -116,6 +149,75 @@ async function createAppointmentsTable() {
       FOREIGN KEY (AvailableTimeID) REFERENCES available_time(AvailableTimeID)
         ON UPDATE CASCADE
         ON DELETE CASCADE
+    )`
+  );
+
+  await addColumnIfMissing('appointments', 'Status', "ENUM('pending','confirmed','completed','cancelled') NOT NULL DEFAULT 'pending'");
+  await addColumnIfMissing('appointments', 'Notes', 'TEXT NULL');
+  await addColumnIfMissing('appointments', 'CreatedAt', 'DATETIME DEFAULT CURRENT_TIMESTAMP');
+  await addColumnIfMissing(
+    'appointments',
+    'UpdatedAt',
+    'DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'
+  );
+}
+
+async function createDoctorApplicationsTable() {
+  await execute(
+    `CREATE TABLE IF NOT EXISTS doctor_applications (
+      ApplicationID INT PRIMARY KEY AUTO_INCREMENT,
+      FullName VARCHAR(255) NOT NULL,
+      Email VARCHAR(255) NOT NULL,
+      PhoneNumber VARCHAR(50) NOT NULL,
+      Specialization VARCHAR(255) NOT NULL,
+      LicenseNumber VARCHAR(100) NOT NULL,
+      NidNumber VARCHAR(100) NOT NULL,
+      LicenseDocumentUrl TEXT NOT NULL,
+      NidDocumentUrl TEXT NOT NULL,
+      ResumeUrl TEXT NULL,
+      Status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+      SubmittedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      ReviewedAt DATETIME NULL,
+      ReviewerID INT NULL,
+      ReviewNotes TEXT NULL,
+      DoctorID INT NULL,
+      FOREIGN KEY (ReviewerID) REFERENCES users(UserID) ON DELETE SET NULL,
+      FOREIGN KEY (DoctorID) REFERENCES doctors(DoctorID) ON DELETE SET NULL
+    )`
+  );
+
+  await addColumnIfMissing('doctor_applications', 'DoctorID', 'INT NULL');
+}
+
+async function createPatientDocumentsTable() {
+  await execute(
+    `CREATE TABLE IF NOT EXISTS patient_documents (
+      DocumentID INT PRIMARY KEY AUTO_INCREMENT,
+      PatientID INT NOT NULL,
+      DocumentName VARCHAR(255) NOT NULL,
+      FileUrl TEXT NOT NULL,
+      UploadedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (PatientID) REFERENCES patients(PatientID)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+    )`
+  );
+}
+
+async function createDoctorReportsTable() {
+  await execute(
+    `CREATE TABLE IF NOT EXISTS doctor_reports (
+      ReportID INT PRIMARY KEY AUTO_INCREMENT,
+      AppointmentID INT NOT NULL,
+      DoctorID INT NOT NULL,
+      PatientID INT NOT NULL,
+      Title VARCHAR(255) NOT NULL,
+      Description TEXT NULL,
+      FileUrl TEXT NOT NULL,
+      CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (AppointmentID) REFERENCES appointments(AppointmentID) ON DELETE CASCADE,
+      FOREIGN KEY (DoctorID) REFERENCES doctors(DoctorID) ON DELETE CASCADE,
+      FOREIGN KEY (PatientID) REFERENCES patients(PatientID) ON DELETE CASCADE
     )`
   );
 }
@@ -169,19 +271,56 @@ async function seedDoctors() {
   }
 
   const doctors = [
-    ['Dr. John Smith', 100, 0],
-    ['Dr. Emily Davis', 80, 0],
-    ['Dr. Michael Brown', 120, 0],
-    ['Dr. Aisha Rahman', 90, 0],
-    ['Dr. Farid Ahmed', 110, 0],
-    ['Dr. Laila Chowdhury', 85, 0],
+    {
+      name: 'Dr. John Smith',
+      max: 100,
+      email: 'dr.john@hospital.com',
+      phone: '+8801711000001',
+      specialization: 'Cardiology',
+    },
+    {
+      name: 'Dr. Emily Davis',
+      max: 80,
+      email: 'dr.emily@hospital.com',
+      phone: '+8801711000002',
+      specialization: 'Neurology',
+    },
+    {
+      name: 'Dr. Michael Brown',
+      max: 120,
+      email: 'dr.michael@hospital.com',
+      phone: '+8801711000003',
+      specialization: 'Orthopedics',
+    },
+    {
+      name: 'Dr. Aisha Rahman',
+      max: 90,
+      email: 'dr.aisha@hospital.com',
+      phone: '+8801711000004',
+      specialization: 'General Medicine',
+    },
+    {
+      name: 'Dr. Farid Ahmed',
+      max: 110,
+      email: 'dr.farid@hospital.com',
+      phone: '+8801711000005',
+      specialization: 'Dermatology',
+    },
+    {
+      name: 'Dr. Laila Chowdhury',
+      max: 85,
+      email: 'dr.laila@hospital.com',
+      phone: '+8801711000006',
+      specialization: 'Pediatrics',
+    },
   ];
 
   await Promise.all(
-    doctors.map((doctor) =>
+    doctors.map(({ name, max, email, phone, specialization }) =>
       execute(
-        'INSERT INTO doctors (FullName, MaxPatientNumber, CurrentPatientNumber) VALUES (?, ?, ?)',
-        doctor
+        `INSERT INTO doctors (FullName, MaxPatientNumber, CurrentPatientNumber, Email, PhoneNumber, Specialization)
+         VALUES (?, ?, 0, ?, ?, ?)`,
+        [name, max, email, phone, specialization]
       )
     )
   );
@@ -238,6 +377,76 @@ async function seedDoctorUsers() {
         `INSERT INTO users (Email, PasswordHash, Role, DoctorID)
          VALUES (?, ?, 'doctor', ?)`,
         [email, passwordHash, doctor.DoctorID]
+      );
+    })
+  );
+}
+
+async function seedPatientsWithHistory() {
+  const [{ count }] = await execute('SELECT COUNT(*) AS count FROM patients');
+  if (count > 0) {
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash('Patient@123', 10);
+
+  const patients = [
+    {
+      name: 'Rahim Uddin',
+      email: 'rahim.patients@hospital.com',
+      phone: '+8801711223344',
+      nid: '1987654321',
+      address: 'House 12, Road 5, Dhanmondi, Dhaka',
+      gender: 'Male',
+      birthDate: '1988-04-12',
+      avatar: null,
+    },
+    {
+      name: 'Shamsi Akter',
+      email: 'shamsi.patients@hospital.com',
+      phone: '+8801711556677',
+      nid: '2387654321',
+      address: 'Apartment 4B, Banani, Dhaka',
+      gender: 'Female',
+      birthDate: '1992-09-23',
+      avatar: null,
+    },
+  ];
+
+  await Promise.all(
+    patients.map(async (patient, index) => {
+      const [doctor] = await execute('SELECT DoctorID FROM doctors ORDER BY DoctorID LIMIT 1 OFFSET ?', [index]);
+      const doctorId = doctor?.DoctorID || null;
+
+      const result = await execute(
+        `INSERT INTO patients (FullName, BirthDate, PhoneNumber, Email, Gender, PasswordHash, NidNumber, Address, DoctorID, AvatarUrl)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          patient.name,
+          patient.birthDate,
+          patient.phone,
+          patient.email,
+          patient.gender,
+          passwordHash,
+          patient.nid,
+          patient.address,
+          doctorId,
+          patient.avatar,
+        ]
+      );
+
+      const patientId = result.insertId;
+
+      await execute(
+        `INSERT INTO users (Email, PasswordHash, Role, PatientID)
+         VALUES (?, ?, 'patient', ?)`,
+        [patient.email, passwordHash, patientId]
+      );
+
+      await execute(
+        `INSERT INTO patient_documents (PatientID, DocumentName, FileUrl)
+         VALUES (?, 'Initial Medical History', 'https://example.com/sample-history.pdf')`,
+        [patientId]
       );
     })
   );
@@ -313,6 +522,8 @@ async function seedSiteContent() {
       emergencyContactEmail: 'emergency@destinationhealth.com',
       emergencyContactAddress: '221B Harbor Street, Seattle, WA',
       footerNote: 'Secured with HIPAA-compliant infrastructure.',
+      supportPhone: '+8801711000000',
+      supportWhatsappUrl: 'https://wa.me/8801711000000',
     };
 
     await execute(
