@@ -12,6 +12,9 @@ function authenticateToken(req, res, next) {
 
   try {
     const payload = jwt.verify(token, config.jwt.secret);
+    if (!payload?.role) {
+      return res.status(403).json({ message: 'Invalid access token' });
+    }
     req.user = payload;
     next();
   } catch (error) {

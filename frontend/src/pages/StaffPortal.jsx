@@ -9,9 +9,15 @@ function StaffPortal() {
 
   useEffect(() => {
     const getUpcomingAppointments = async () => {
+      if (!auth.user || auth.user.role !== 'doctor') {
+        setError('Access restricted to doctor accounts.');
+        setLoading(false);
+        return;
+      }
+
       try {
         const res = await fetch(
-          `${process.env.REACT_APP_API_URL}/api/patients/${auth.user.id}/upcomingAppointments`,
+          `${process.env.REACT_APP_API_URL}/api/doctors/${auth.user.id}/appointments`,
           {
             headers: {
               Authorization: `Bearer ${auth.token}`,
@@ -33,7 +39,7 @@ function StaffPortal() {
       }
     };
 
-    if (auth.user && auth.token) {
+    if (auth.token) {
       getUpcomingAppointments();
     }
   }, [auth.user, auth.token]);
@@ -43,8 +49,8 @@ function StaffPortal() {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 pb-12">
       <header className="text-center">
-        <h1 className="text-3xl font-semibold text-slate-900">Staff Portal</h1>
-        <p className="mt-2 text-slate-600">Review upcoming appointments at a glance.</p>
+        <h1 className="text-3xl font-semibold text-slate-900">Doctor Dashboard</h1>
+        <p className="mt-2 text-slate-600">Review your upcoming appointments at a glance.</p>
       </header>
 
       <section className="rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-card backdrop-blur">
@@ -56,7 +62,7 @@ function StaffPortal() {
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-100 text-left text-slate-700">
               <tr>
-                <th className="px-4 py-3 font-semibold">Doctor</th>
+                <th className="px-4 py-3 font-semibold">Patient</th>
                 <th className="px-4 py-3 font-semibold">Date</th>
                 <th className="px-4 py-3 font-semibold">Time</th>
               </tr>
@@ -71,7 +77,7 @@ function StaffPortal() {
               ) : upcomingAppointments.length > 0 ? (
                 upcomingAppointments.map((appointment) => (
                   <tr key={appointment.AppointmentID} className="odd:bg-white even:bg-slate-50">
-                    <td className={tableCellClasses}>{appointment.doctor}</td>
+                    <td className={tableCellClasses}>{appointment.patient}</td>
                     <td className={tableCellClasses}>{appointment.date}</td>
                     <td className={tableCellClasses}>{`${appointment.startTime} - ${appointment.endTime}`}</td>
                   </tr>

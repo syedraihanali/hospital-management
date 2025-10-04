@@ -48,6 +48,8 @@ export const AuthProvider = ({ children }) => {
             user: normalizeUser({
               id: decoded.id,
               email: decoded.email,
+              role: decoded.role,
+              fullName: decoded.fullName,
               firstName: decoded.firstName || decoded.given_name,
               avatarUrl: decoded.avatarUrl || decoded.picture,
             }),
