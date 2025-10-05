@@ -202,6 +202,8 @@ async function createPatientDocumentsTable() {
         ON DELETE CASCADE
     )`
   );
+
+  await addColumnIfMissing('patient_documents', 'AppointmentID', 'INT NULL');
 }
 
 async function createDoctorReportsTable() {

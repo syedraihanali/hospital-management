@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useContext, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../auth/context/AuthContext';
 
 function BookAppointmentPage() {
-  const { auth } = useContext(AuthContext);
+  const { auth, login } = useContext(AuthContext);
   const navigate = useNavigate();
+  const location = useLocation();
   const apiBaseUrl = (process.env.REACT_APP_API_URL || '').replace(/\/$/, '');
 
   const [doctors, setDoctors] = useState([]);
@@ -13,19 +14,32 @@ function BookAppointmentPage() {
   const [uniqueDates, setUniqueDates] = useState([]);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedSlotId, setSelectedSlotId] = useState('');
-  const [status, setStatus] = useState('idle');
+  const [notes, setNotes] = useState('');
+  const [documents, setDocuments] = useState([]);
+  const [documentInputKey, setDocumentInputKey] = useState(0);
+  const [availabilityStatus, setAvailabilityStatus] = useState('idle');
+  const [submissionStatus, setSubmissionStatus] = useState('idle');
   const [message, setMessage] = useState({ type: '', text: '' });
-
-  const selectedDoctor = useMemo(
-    () => doctors.find((doctor) => String(doctor.DoctorID) === String(selectedDoctorId)) || null,
-    [doctors, selectedDoctorId]
-  );
+  const [showRegistrationForm, setShowRegistrationForm] = useState(false);
+  const [registrationData, setRegistrationData] = useState({
+    fullName: '',
+    birthdate: '',
+    gender: '',
+    phoneNumber: '',
+    nidNumber: '',
+    email: '',
+    password: '',
+    address: '',
+    termsAccepted: false,
+  });
+  const [prefillState, setPrefillState] = useState(location.state || null);
 
   useEffect(() => {
-    if (!auth.token) {
-      navigate('/signin/patient', { replace: true });
+    if (location.state) {
+      setPrefillState(location.state);
+      navigate(location.pathname, { replace: true, state: null });
     }
-  }, [auth.token, navigate]);
+  }, [location.pathname, location.state, navigate]);
 
   useEffect(() => {
     const loadDoctors = async () => {
@@ -37,7 +51,8 @@ function BookAppointmentPage() {
         const data = await response.json();
         setDoctors(data);
         if (data.length > 0) {
-          setSelectedDoctorId(String(data[0].DoctorID));
+          const defaultDoctorId = String(prefillState?.doctorId || data[0].DoctorID);
+          setSelectedDoctorId(defaultDoctorId);
         }
       } catch (error) {
         setMessage({ type: 'error', text: error.message || 'Failed to load doctors.' });
@@ -45,52 +60,134 @@ function BookAppointmentPage() {
     };
 
     loadDoctors();
-  }, [apiBaseUrl]);
+  }, [apiBaseUrl, prefillState]);
 
   useEffect(() => {
-    const loadAvailability = async () => {
-      if (!selectedDoctorId || !auth.token) {
-        setAvailableTimes([]);
-        setUniqueDates([]);
-        setSelectedDate('');
-        setSelectedSlotId('');
-        return;
-      }
+    if (!selectedDoctorId) {
+      setAvailableTimes([]);
+      setUniqueDates([]);
+      setSelectedDate('');
+      setSelectedSlotId('');
+      return;
+    }
 
-      setStatus('loading');
-      setMessage({ type: '', text: '' });
+    const loadAvailability = async () => {
+      setAvailabilityStatus('loading');
+      setUniqueDates([]);
+      setSelectedDate('');
+      setSelectedSlotId('');
 
       try {
         const response = await fetch(
-          `${apiBaseUrl}/api/appointments/available-times?doctorId=${selectedDoctorId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${auth.token}`,
-            },
-          }
+          `${apiBaseUrl}/api/appointments/available-times?doctorId=${selectedDoctorId}`
         );
-
         if (!response.ok) {
           throw new Error('Unable to load appointment slots.');
         }
-
         const data = await response.json();
         setAvailableTimes(data);
         const dates = [...new Set(data.map((slot) => slot.ScheduleDate))].sort();
         setUniqueDates(dates);
-        setSelectedDate('');
-        setSelectedSlotId('');
-        setStatus('succeeded');
+        setAvailabilityStatus('succeeded');
       } catch (error) {
         setAvailableTimes([]);
         setUniqueDates([]);
+        setAvailabilityStatus('failed');
         setMessage({ type: 'error', text: error.message || 'Failed to load appointment slots.' });
-        setStatus('failed');
       }
     };
 
     loadAvailability();
-  }, [apiBaseUrl, auth.token, selectedDoctorId]);
+  }, [apiBaseUrl, selectedDoctorId]);
+
+  useEffect(() => {
+    if (prefillState?.notes) {
+      setNotes(prefillState.notes);
+    }
+  }, [prefillState]);
+
+  useEffect(() => {
+    if (prefillState?.doctorId && doctors.length) {
+      setSelectedDoctorId(String(prefillState.doctorId));
+    }
+  }, [doctors, prefillState]);
+
+  useEffect(() => {
+    if (!prefillState?.date) {
+      return;
+    }
+    if (uniqueDates.includes(prefillState.date)) {
+      setSelectedDate(prefillState.date);
+    }
+  }, [prefillState, uniqueDates]);
+
+  useEffect(() => {
+    if (!prefillState?.slotId) {
+      return;
+    }
+    const match = availableTimes.find(
+      (slot) => String(slot.AvailableTimeID) === String(prefillState.slotId)
+    );
+    if (match) {
+      setSelectedDate(match.ScheduleDate);
+      setSelectedSlotId(String(match.AvailableTimeID));
+    }
+  }, [availableTimes, prefillState]);
+
+  useEffect(() => {
+    if (auth.user) {
+      setRegistrationData((prev) => ({
+        ...prev,
+        fullName: auth.user.fullName || auth.user.firstName || prev.fullName,
+        email: auth.user.email || prev.email,
+      }));
+      setShowRegistrationForm(false);
+    }
+  }, [auth.user]);
+
+  const selectedDoctor = useMemo(
+    () => doctors.find((doctor) => String(doctor.DoctorID) === String(selectedDoctorId)) || null,
+    [doctors, selectedDoctorId]
+  );
+
+  const slotsForSelectedDate = useMemo(
+    () => availableTimes.filter((slot) => slot.ScheduleDate === selectedDate),
+    [availableTimes, selectedDate]
+  );
+
+  const phonePattern = /^(\+?88)?01[3-9]\d{8}$/;
+
+  const validateRegistration = () => {
+    const requiredFields = [
+      'fullName',
+      'birthdate',
+      'gender',
+      'phoneNumber',
+      'nidNumber',
+      'email',
+      'password',
+      'address',
+    ];
+
+    const missingField = requiredFields.find((field) => !String(registrationData[field] || '').trim());
+    if (missingField) {
+      return 'Please complete all required patient information fields.';
+    }
+
+    if (registrationData.password.length < 8) {
+      return 'Password must be at least 8 characters long.';
+    }
+
+    if (!phonePattern.test(registrationData.phoneNumber)) {
+      return 'Please provide a valid Bangladeshi mobile number.';
+    }
+
+    if (!registrationData.termsAccepted) {
+      return 'Please accept the terms of service to continue.';
+    }
+
+    return '';
+  };
 
   const handleDoctorChange = (event) => {
     setSelectedDoctorId(event.target.value);
@@ -105,25 +202,79 @@ function BookAppointmentPage() {
     setSelectedSlotId(event.target.value);
   };
 
+  const handleRegistrationChange = (event) => {
+    const { name, value, type, checked } = event.target;
+    setRegistrationData((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }));
+  };
+
+  const handleDocumentChange = (event) => {
+    const files = Array.from(event.target.files || []);
+    setDocuments(files);
+  };
+
+  const messageStyles = {
+    success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    error: 'border-rose-200 bg-rose-50 text-rose-700',
+    info: 'border-sky-200 bg-sky-50 text-sky-700',
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
     if (!selectedSlotId) {
-      setMessage({ type: 'error', text: 'Select a time slot to proceed.' });
+      setMessage({ type: 'error', text: 'Select a time slot to continue.' });
       return;
     }
 
-    setStatus('submitting');
+    if (!auth.token) {
+      if (!showRegistrationForm) {
+        setShowRegistrationForm(true);
+        setMessage({
+          type: 'info',
+          text: 'Complete your patient information so we can create your account and confirm the booking.',
+        });
+        return;
+      }
+      const registrationError = validateRegistration();
+      if (registrationError) {
+        setMessage({ type: 'error', text: registrationError });
+        return;
+      }
+    }
+
+    const formData = new FormData();
+    formData.append('availableTimeID', selectedSlotId);
+    if (notes.trim()) {
+      formData.append('notes', notes.trim());
+    }
+    documents.forEach((file) => {
+      formData.append('documents', file);
+    });
+
+    if (!auth.token) {
+      Object.entries(registrationData).forEach(([key, value]) => {
+        if (key === 'termsAccepted') {
+          return;
+        }
+        formData.append(key, value);
+      });
+    }
+
+    setSubmissionStatus('submitting');
     setMessage({ type: '', text: '' });
 
     try {
       const response = await fetch(`${apiBaseUrl}/api/appointments/book`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${auth.token}`,
-        },
-        body: JSON.stringify({ availableTimeID: Number.parseInt(selectedSlotId, 10) }),
+        headers: auth.token
+          ? {
+              Authorization: `Bearer ${auth.token}`,
+            }
+          : undefined,
+        body: formData,
       });
 
       const data = await response.json();
@@ -131,121 +282,325 @@ function BookAppointmentPage() {
         throw new Error(data.error || data.message || 'Unable to book the appointment.');
       }
 
-      setMessage({ type: 'success', text: 'Appointment booked successfully!' });
-      setTimeout(() => navigate('/myprofile'), 2000);
+      if (data.token && data.user) {
+        login(data.token, data.user);
+      }
+
+      setSubmissionStatus('succeeded');
+      setMessage({
+        type: 'success',
+        text: data.message || 'Appointment booked successfully! Redirecting to your profile...',
+      });
+      setDocuments([]);
+      setDocumentInputKey((prev) => prev + 1);
+      setNotes('');
+      setShowRegistrationForm(false);
+      setTimeout(() => navigate('/myprofile'), 2200);
     } catch (error) {
+      setSubmissionStatus('failed');
       setMessage({ type: 'error', text: error.message || 'Failed to book the appointment.' });
-    } finally {
-      setStatus('succeeded');
     }
   };
 
-  const slotsForSelectedDate = useMemo(
-    () => availableTimes.filter((slot) => slot.ScheduleDate === selectedDate),
-    [availableTimes, selectedDate]
-  );
-
-  if (!auth.token) {
-    return null;
-  }
-
   return (
-    <div className="flex min-h-[calc(100vh-7rem)] items-center justify-center px-4 py-10">
-      <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white/95 p-8 shadow-card backdrop-blur">
-        <h1 className="text-3xl font-semibold text-slate-900">Book an appointment</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Select a specialist and choose from their current availability. You will receive confirmation once the doctor approves the request.
-        </p>
-
-        {message.text ? (
-          <div
-            className={`mt-4 rounded-lg px-4 py-3 text-sm font-semibold ${
-              message.type === 'success'
-                ? 'bg-emerald-100 text-emerald-700'
-                : 'bg-rose-100 text-rose-700'
-            }`}
-          >
-            {message.text}
-          </div>
-        ) : null}
-
-        <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
-          <label className="block text-sm font-semibold text-slate-700">
-            Choose a doctor
-            <select
-              value={selectedDoctorId}
-              onChange={handleDoctorChange}
-              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+    <div className="bg-slate-50/60 px-4 py-10">
+      <div className="mx-auto max-w-6xl">
+        <div className="rounded-3xl border border-slate-200 bg-white/95 p-8 shadow-card backdrop-blur">
+          <h1 className="text-3xl font-semibold text-slate-900">Reserve your visit</h1>
+          <p className="mt-2 max-w-2xl text-sm text-slate-600">
+            Choose your preferred specialist, pick an available slot, and share any information you would like your care team to review ahead of the appointment.
+          </p>
+          {message.text ? (
+            <div
+              className={`mt-4 rounded-xl border px-4 py-3 text-sm font-semibold ${
+                messageStyles[message.type] || 'border-slate-200 bg-slate-100 text-slate-700'
+              }`}
             >
-              {doctors.map((doctor) => (
-                <option key={doctor.DoctorID} value={doctor.DoctorID}>
-                  {doctor.FullName} {doctor.Specialization ? `— ${doctor.Specialization}` : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {selectedDoctor ? (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              {selectedDoctor.Specialization ? (
-                <span className="font-semibold text-slate-800">Specialty:</span>
-              ) : null}{' '}
-              {selectedDoctor.Specialization || 'General consultation'}
+              {message.text}
             </div>
           ) : null}
+        </div>
 
-          <label className="block text-sm font-semibold text-slate-700">
-            Appointment date
-            <select
-              value={selectedDate}
-              onChange={handleDateChange}
-              disabled={!uniqueDates.length}
-              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
-            >
-              <option value="">-- Select a date --</option>
-              {uniqueDates.map((date) => (
-                <option key={date} value={date}>
-                  {new Date(date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-                </option>
-              ))}
-            </select>
-          </label>
+        <form
+          className="mt-8 grid gap-6 lg:grid-cols-[2fr,1fr]"
+          onSubmit={handleSubmit}
+          encType="multipart/form-data"
+        >
+          <section className="rounded-3xl border border-slate-200 bg-white/95 p-8 shadow-card backdrop-blur">
+            <div className="space-y-6">
+              <div>
+                <label className="flex flex-col text-sm font-semibold text-slate-700">
+                  Specialist or doctor
+                  <select
+                    value={selectedDoctorId}
+                    onChange={handleDoctorChange}
+                    className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  >
+                    {doctors.map((doctor) => (
+                      <option key={doctor.DoctorID} value={doctor.DoctorID}>
+                        {doctor.FullName}
+                        {doctor.Specialization ? ` — ${doctor.Specialization}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {selectedDoctor ? (
+                  <p className="mt-2 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">
+                    {selectedDoctor.Specialization
+                      ? `${selectedDoctor.FullName} specialises in ${selectedDoctor.Specialization.toLowerCase()}.`
+                      : `${selectedDoctor.FullName} is accepting general consultations.`}
+                  </p>
+                ) : null}
+              </div>
 
-          {selectedDate ? (
-            <label className="block text-sm font-semibold text-slate-700">
-              Available time slots
-              <select
-                value={selectedSlotId}
-                onChange={handleTimeChange}
-                disabled={!slotsForSelectedDate.length}
-                className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
-              >
-                <option value="">-- Select a time --</option>
-                {slotsForSelectedDate.map((slot) => (
-                  <option key={slot.AvailableTimeID} value={slot.AvailableTimeID}>
-                    {slot.StartTime} - {slot.EndTime}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
+              <div className="grid gap-6 sm:grid-cols-2">
+                <label className="flex flex-col text-sm font-semibold text-slate-700">
+                  Appointment date
+                  <select
+                    value={selectedDate}
+                    onChange={handleDateChange}
+                    disabled={!uniqueDates.length}
+                    className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent disabled:cursor-not-allowed"
+                  >
+                    <option value="">-- Select a date --</option>
+                    {uniqueDates.map((date) => (
+                      <option key={date} value={date}>
+                        {new Date(date).toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-          <button
-            type="submit"
-            disabled={status === 'loading' || status === 'submitting' || !selectedSlotId}
-            className="w-full rounded-lg bg-brand-primary px-4 py-3 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2"
-          >
-            {status === 'submitting' ? 'Booking appointment...' : 'Book appointment'}
-          </button>
+                <label className="flex flex-col text-sm font-semibold text-slate-700">
+                  Time
+                  <select
+                    value={selectedSlotId}
+                    onChange={handleTimeChange}
+                    disabled={!selectedDate || !slotsForSelectedDate.length}
+                    className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent disabled:cursor-not-allowed"
+                  >
+                    <option value="">-- Select a time --</option>
+                    {slotsForSelectedDate.map((slot) => (
+                      <option key={slot.AvailableTimeID} value={slot.AvailableTimeID}>
+                        {slot.StartTime} - {slot.EndTime}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              {availabilityStatus === 'loading' ? (
+                <p className="text-sm text-slate-500">Loading the latest availability…</p>
+              ) : null}
+              {!uniqueDates.length && availabilityStatus === 'succeeded' ? (
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                  This doctor has no open slots at the moment. Try another doctor or check back soon.
+                </p>
+              ) : null}
+
+              <div>
+                <label className="flex flex-col text-sm font-semibold text-slate-700">
+                  Notes for your care team (optional)
+                  <textarea
+                    value={notes}
+                    onChange={(event) => setNotes(event.target.value)}
+                    rows={4}
+                    placeholder="Share symptoms, ongoing treatments, or goals for this visit."
+                    className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  />
+                </label>
+              </div>
+
+              <div>
+                <label className="flex flex-col text-sm font-semibold text-slate-700">
+                  Recent medical documents (PDF, image, max 10 MB each)
+                  <input
+                    key={documentInputKey}
+                    type="file"
+                    multiple
+                    onChange={handleDocumentChange}
+                    className="mt-2 w-full rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2 text-sm shadow-sm file:mr-3 file:rounded-md file:border-0 file:bg-brand-primary file:px-4 file:py-2 file:font-semibold file:text-white hover:file:bg-blue-700"
+                  />
+                </label>
+                {documents.length ? (
+                  <ul className="mt-2 space-y-1 text-xs text-slate-600">
+                    {documents.map((file) => (
+                      <li key={file.name} className="truncate">
+                        {file.name}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={
+                    submissionStatus === 'submitting' ||
+                    availabilityStatus === 'loading' ||
+                    !selectedSlotId
+                  }
+                  className="inline-flex items-center justify-center rounded-xl bg-brand-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-primary/30 transition hover:-translate-y-0.5 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2"
+                >
+                  {submissionStatus === 'submitting' ? 'Reserving appointment…' : 'Reserve appointment'}
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            {auth.token ? (
+              <div className="rounded-3xl border border-emerald-200 bg-emerald-50/60 p-6 text-sm text-emerald-800 shadow-inner">
+                <h2 className="text-base font-semibold text-emerald-900">Booking as</h2>
+                <p className="mt-2 font-semibold">{auth.user?.fullName || auth.user?.firstName}</p>
+                <p className="text-sm">{auth.user?.email}</p>
+                <p className="mt-4 text-xs text-emerald-700">
+                  We'll confirm your reservation in your patient portal and notify you via email.
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card">
+                <h2 className="text-base font-semibold text-slate-900">New patient information</h2>
+                <p className="mt-2 text-sm text-slate-600">
+                  Complete the details below to create your patient account while reserving this slot.
+                </p>
+
+                {showRegistrationForm ? (
+                  <div className="mt-4 space-y-4">
+                    <label className="flex flex-col text-sm font-semibold text-slate-700">
+                      Full name
+                      <input
+                        type="text"
+                        name="fullName"
+                        value={registrationData.fullName}
+                        onChange={handleRegistrationChange}
+                        required
+                        className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      />
+                    </label>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="flex flex-col text-sm font-semibold text-slate-700">
+                        Birthdate
+                        <input
+                          type="date"
+                          name="birthdate"
+                          value={registrationData.birthdate}
+                          onChange={handleRegistrationChange}
+                          required
+                          className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                        />
+                      </label>
+
+                      <label className="flex flex-col text-sm font-semibold text-slate-700">
+                        Gender
+                        <select
+                          name="gender"
+                          value={registrationData.gender}
+                          onChange={handleRegistrationChange}
+                          required
+                          className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                        >
+                          <option value="">-- Select gender --</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                          <option value="Prefer not to say">Prefer not to say</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <label className="flex flex-col text-sm font-semibold text-slate-700">
+                      Mobile number
+                      <input
+                        type="tel"
+                        name="phoneNumber"
+                        value={registrationData.phoneNumber}
+                        onChange={handleRegistrationChange}
+                        placeholder="e.g. +8801XXXXXXXXX"
+                        required
+                        className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      />
+                    </label>
+
+                    <label className="flex flex-col text-sm font-semibold text-slate-700">
+                      National ID (NID)
+                      <input
+                        type="text"
+                        name="nidNumber"
+                        value={registrationData.nidNumber}
+                        onChange={handleRegistrationChange}
+                        required
+                        className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      />
+                    </label>
+
+                    <label className="flex flex-col text-sm font-semibold text-slate-700">
+                      Email
+                      <input
+                        type="email"
+                        name="email"
+                        value={registrationData.email}
+                        onChange={handleRegistrationChange}
+                        required
+                        className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      />
+                    </label>
+
+                    <label className="flex flex-col text-sm font-semibold text-slate-700">
+                      Password
+                      <input
+                        type="password"
+                        name="password"
+                        value={registrationData.password}
+                        onChange={handleRegistrationChange}
+                        required
+                        minLength={8}
+                        className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      />
+                    </label>
+
+                    <label className="flex flex-col text-sm font-semibold text-slate-700">
+                      Address
+                      <textarea
+                        name="address"
+                        value={registrationData.address}
+                        onChange={handleRegistrationChange}
+                        rows={3}
+                        required
+                        className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      />
+                    </label>
+
+                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                      <input
+                        type="checkbox"
+                        name="termsAccepted"
+                        checked={registrationData.termsAccepted}
+                        onChange={handleRegistrationChange}
+                        className="h-4 w-4 rounded border-slate-300 text-brand-primary focus:ring-brand-accent"
+                      />
+                      I agree to the Destination Health terms of service and privacy policy.
+                    </label>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowRegistrationForm(true)}
+                    className="mt-4 inline-flex items-center justify-center rounded-xl border border-brand-primary px-4 py-2 text-sm font-semibold text-brand-primary transition hover:bg-brand-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2"
+                  >
+                    Enter patient information
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
         </form>
-
-        {status === 'loading' ? (
-          <p className="mt-4 text-sm text-slate-500">Loading latest availability...</p>
-        ) : null}
-
-        {!uniqueDates.length && status === 'succeeded' ? (
-          <p className="mt-4 text-sm text-slate-500">No open slots for this doctor right now. Please try another doctor or check back later.</p>
-        ) : null}
       </div>
     </div>
   );

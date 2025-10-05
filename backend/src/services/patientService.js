@@ -24,21 +24,26 @@ async function createPatient({
 
     const patientId = patientResult.insertId;
 
-    await connection.execute(
+    const [userResult] = await connection.execute(
       `INSERT INTO users (Email, PasswordHash, Role, PatientID)
        VALUES (?, ?, 'patient', ?)`,
       [email, passwordHash, patientId]
     );
 
     if (documents.length) {
-      const values = documents.map(({ name, url }) => [patientId, name, url]);
+      const values = documents.map(({ name, url, appointmentId = null }) => [
+        patientId,
+        name,
+        url,
+        appointmentId,
+      ]);
       await connection.query(
-        'INSERT INTO patient_documents (PatientID, DocumentName, FileUrl) VALUES ?',
+        'INSERT INTO patient_documents (PatientID, DocumentName, FileUrl, AppointmentID) VALUES ?',
         [values]
       );
     }
 
-    return { id: patientId, fullName, email };
+    return { id: patientId, userId: userResult.insertId, fullName, email };
   });
 }
 
@@ -70,7 +75,7 @@ async function listPatientDocuments(patientId, { search = '', sort = 'desc' } = 
   const order = sort === 'asc' ? 'ASC' : 'DESC';
   const like = `%${search}%`;
   return execute(
-    `SELECT DocumentID, DocumentName, FileUrl, UploadedAt
+    `SELECT DocumentID, DocumentName, FileUrl, UploadedAt, AppointmentID
      FROM patient_documents
      WHERE PatientID = ? AND DocumentName LIKE ?
      ORDER BY UploadedAt ${order}`,
@@ -91,11 +96,11 @@ async function listPatientReports(patientId, { search = '', sort = 'desc' } = {}
   );
 }
 
-async function savePatientDocument(patientId, name, url) {
+async function savePatientDocument(patientId, name, url, appointmentId = null) {
   await execute(
-    `INSERT INTO patient_documents (PatientID, DocumentName, FileUrl)
-     VALUES (?, ?, ?)`,
-    [patientId, name, url]
+    `INSERT INTO patient_documents (PatientID, DocumentName, FileUrl, AppointmentID)
+     VALUES (?, ?, ?, ?)`,
+    [patientId, name, url, appointmentId]
   );
 }
 

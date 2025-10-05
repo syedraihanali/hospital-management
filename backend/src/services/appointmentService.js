@@ -76,7 +76,7 @@ async function getAvailableTimes(doctorId) {
 }
 
 // Books an appointment within a database transaction to avoid double booking.
-async function bookAppointment({ patientId, availableTimeId }) {
+async function bookAppointment({ patientId, availableTimeId, notes = '' }) {
   return transaction(async (connection) => {
     const [timeSlots] = await connection.execute(
       'SELECT * FROM available_time WHERE AvailableTimeID = ? AND IsAvailable = 1 FOR UPDATE',
@@ -91,9 +91,9 @@ async function bookAppointment({ patientId, availableTimeId }) {
     }
 
     const [appointmentResult] = await connection.execute(
-      `INSERT INTO appointments (PatientID, DoctorID, AvailableTimeID, Status)
-       VALUES (?, ?, ?, 'pending')`,
-      [patientId, timeSlot.DoctorID, availableTimeId]
+      `INSERT INTO appointments (PatientID, DoctorID, AvailableTimeID, Status, Notes)
+       VALUES (?, ?, ?, 'pending', ?)`,
+      [patientId, timeSlot.DoctorID, availableTimeId, notes || null]
     );
 
     await connection.execute('UPDATE available_time SET IsAvailable = 0 WHERE AvailableTimeID = ?', [
@@ -106,6 +106,7 @@ async function bookAppointment({ patientId, availableTimeId }) {
       scheduleDate: timeSlot.ScheduleDate,
       startTime: timeSlot.StartTime,
       endTime: timeSlot.EndTime,
+      notes: notes || null,
     };
   });
 }
