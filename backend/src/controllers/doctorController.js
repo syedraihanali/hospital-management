@@ -12,6 +12,9 @@ const {
   updateAppointmentStatus,
   getAppointmentById,
   reopenAvailabilitySlot,
+  listAvailabilityForDoctorManagement,
+  updateAvailabilitySlotStatus,
+  hasActiveAppointmentForSlot,
 } = require('../services/appointmentService');
 const { createDoctorReport } = require('../services/reportService');
 const { storeFile } = require('../services/storageService');
@@ -42,6 +45,17 @@ async function getDoctorAvailability(req, res) {
   const payload = Number.isNaN(limit) || limit <= 0 ? availability : availability.slice(0, limit);
 
   return res.json(payload);
+}
+
+async function getDoctorAvailabilityForManagement(req, res) {
+  const doctorId = Number.parseInt(req.params.id, 10);
+
+  if (req.user.role !== 'doctor' || req.user.id !== doctorId) {
+    return res.status(403).json({ message: 'Access denied.' });
+  }
+
+  const availability = await listAvailabilityForDoctorManagement(doctorId);
+  return res.json(availability);
 }
 
 // Provides upcoming appointments for the authenticated doctor.
@@ -136,6 +150,43 @@ async function addAvailability(req, res) {
 
   await createAvailabilitySlots(doctorId, sanitizedSlots);
   return res.status(201).json({ message: 'Availability updated successfully.' });
+}
+
+async function updateDoctorAvailabilityStatus(req, res) {
+  const doctorId = Number.parseInt(req.params.doctorId, 10);
+  const slotId = Number.parseInt(req.params.slotId, 10);
+  const { isAvailable } = req.body;
+
+  if (req.user.role !== 'doctor' || req.user.id !== doctorId) {
+    return res.status(403).json({ message: 'Access denied.' });
+  }
+
+  if (Number.isNaN(slotId)) {
+    return res.status(400).json({ message: 'Invalid availability slot identifier.' });
+  }
+
+  if (typeof isAvailable !== 'boolean') {
+    return res.status(400).json({ message: 'The availability status must be provided as a boolean value.' });
+  }
+
+  if (!isAvailable) {
+    const hasAppointment = await hasActiveAppointmentForSlot(slotId);
+    if (hasAppointment) {
+      return res
+        .status(409)
+        .json({ message: 'Cannot mark this slot as unavailable because an appointment is scheduled.' });
+    }
+  }
+
+  const updatedRows = await updateAvailabilitySlotStatus(slotId, doctorId, isAvailable);
+
+  if (!updatedRows) {
+    return res.status(404).json({ message: 'Availability slot not found.' });
+  }
+
+  return res.json({
+    message: isAvailable ? 'Availability slot restored.' : 'Availability slot marked as unavailable.',
+  });
 }
 
 async function updateAppointmentStatusHandler(req, res) {
@@ -246,9 +297,11 @@ async function changeDoctorPassword(req, res) {
 module.exports = {
   getDoctors,
   getDoctorAvailability,
+  getDoctorAvailabilityForManagement,
   getDoctorAppointments,
   applyAsDoctor,
   addAvailability,
+  updateDoctorAvailabilityStatus,
   updateAppointmentStatusHandler,
   uploadAppointmentReport,
   updateDoctorProfileHandler,
