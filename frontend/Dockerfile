@@ -4,7 +4,9 @@ FROM node:20-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+# Use npm install because the project does not commit a package-lock.json
+# which makes npm ci fail.
+RUN npm install
 
 COPY . .
 
