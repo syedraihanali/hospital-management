@@ -30,6 +30,16 @@ const defaultSiteSettings = {
   supportWhatsappUrl: 'https://wa.me/8801711000000',
 };
 
+const defaultHomeHeroContent = {
+  eyebrow: 'Coordinated care, on your schedule',
+  title: 'Expert specialists and secure records in one hospital hub',
+  subtitle:
+    'Plan visits, share medical documents, and stay aligned with your care team from the comfort of your home.',
+  imageUrl:
+    'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?auto=format&fit=crop&w=1600&q=80',
+  ctaLabel: 'Book an appointment',
+};
+
 function normalizeAboutContent(content = {}) {
   const hero = content.hero || {};
   const sections = Array.isArray(content.sections) ? content.sections : [];
@@ -82,6 +92,16 @@ function normalizeSiteSettings(settings = {}) {
   };
 }
 
+function normalizeHomeHeroContent(content = {}) {
+  return {
+    eyebrow: normalizeStrings(content.eyebrow) || defaultHomeHeroContent.eyebrow,
+    title: normalizeStrings(content.title) || defaultHomeHeroContent.title,
+    subtitle: normalizeStrings(content.subtitle) || defaultHomeHeroContent.subtitle,
+    imageUrl: normalizeStrings(content.imageUrl) || defaultHomeHeroContent.imageUrl,
+    ctaLabel: normalizeStrings(content.ctaLabel) || defaultHomeHeroContent.ctaLabel,
+  };
+}
+
 async function getAboutContent() {
   const rows = await execute('SELECT ContentValue FROM site_content WHERE ContentKey = ?', ['about_page']);
   if (!rows.length) {
@@ -98,6 +118,15 @@ async function getSiteSettings() {
   }
 
   return normalizeSiteSettings(parseJSON(rows[0].ContentValue));
+}
+
+async function getHomeHeroContent() {
+  const rows = await execute('SELECT ContentValue FROM site_content WHERE ContentKey = ?', ['home_hero']);
+  if (!rows.length) {
+    return normalizeHomeHeroContent();
+  }
+
+  return normalizeHomeHeroContent(parseJSON(rows[0].ContentValue));
 }
 
 async function updateAboutContent(content) {
@@ -126,15 +155,43 @@ async function updateSiteSettings(settings) {
   return normalized;
 }
 
+async function updateHomeHeroContent(content) {
+  const normalized = normalizeHomeHeroContent(content);
+
+  await execute(
+    `INSERT INTO site_content (ContentKey, ContentValue)
+     VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE ContentValue = VALUES(ContentValue), UpdatedAt = CURRENT_TIMESTAMP`,
+    ['home_hero', JSON.stringify(normalized)]
+  );
+
+  return normalized;
+}
+
 function normalizePackagePayload(payload = {}) {
   const items = Array.isArray(payload.items) ? payload.items : [];
 
   const sanitizedItems = items
-    .map((item) => ({
-      id: item.id || item.packageItemId || item.PackageItemID || null,
-      name: normalizeStrings(item.name || item.ItemName),
-      price: Math.max(0, Number.parseFloat(item.price ?? item.ItemPrice ?? 0) || 0),
-    }))
+    .map((item) => {
+      const rawId =
+        item.id !== undefined && item.id !== null
+          ? item.id
+          : item.packageItemId !== undefined && item.packageItemId !== null
+          ? item.packageItemId
+          : item.PackageItemID !== undefined && item.PackageItemID !== null
+          ? item.PackageItemID
+          : null;
+
+      const normalizedIdSource = Array.isArray(rawId) ? rawId[0] : rawId;
+      const normalizedIdNumber = Number.parseInt(normalizedIdSource, 10);
+      const normalizedId = Number.isNaN(normalizedIdNumber) ? null : normalizedIdNumber;
+
+      return {
+        id: normalizedId,
+        name: normalizeStrings(item.name || item.ItemName),
+        price: Math.max(0, Number.parseFloat(item.price ?? item.ItemPrice ?? 0) || 0),
+      };
+    })
     .filter((item) => item.name.length > 0);
 
   const rawSortOrder =
@@ -291,7 +348,9 @@ async function updateServicePackage(packageId, payload) {
       'SELECT PackageItemID FROM service_package_items WHERE PackageID = ?',
       [packageId]
     );
-    const existingItemIds = existingRows.map((row) => row.PackageItemID);
+    const existingItemIds = existingRows
+      .map((row) => Number.parseInt(row.PackageItemID, 10))
+      .filter((id) => !Number.isNaN(id));
 
     const totalPrice = normalized.items.reduce((sum, item) => sum + Number(item.price), 0);
 
@@ -326,10 +385,17 @@ async function updateServicePackage(packageId, payload) {
 
     const idsToDelete = existingItemIds.filter((id) => !retainedIds.has(id));
     if (idsToDelete.length > 0) {
-      await connection.execute(
-        `DELETE FROM service_package_items WHERE PackageItemID IN (?)`,
-        [idsToDelete]
-      );
+      const numericIds = idsToDelete
+        .map((id) => Number.parseInt(id, 10))
+        .filter((id) => !Number.isNaN(id));
+
+      if (numericIds.length > 0) {
+        const placeholders = numericIds.map(() => '?').join(', ');
+        await connection.execute(
+          `DELETE FROM service_package_items WHERE PackageItemID IN (${placeholders})`,
+          numericIds
+        );
+      }
     }
 
     return packageId;
@@ -350,6 +416,8 @@ module.exports = {
   updateAboutContent,
   getSiteSettings,
   updateSiteSettings,
+  getHomeHeroContent,
+  updateHomeHeroContent,
   getServicePackages,
   getServicePackageById,
   createServicePackage,

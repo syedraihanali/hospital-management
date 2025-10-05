@@ -16,6 +16,7 @@ const {
   getDoctorProfile,
   getDoctorAvailabilityForManagement,
   updateDoctorAvailabilityStatus,
+  getPatientHistoryForDoctor,
 } = require('../controllers/doctorController');
 
 const router = Router();
@@ -49,6 +50,12 @@ router.get(
   authenticateToken,
   authorizeRoles('doctor', 'admin'),
   asyncHandler(getDoctorProfile)
+);
+router.get(
+  '/:doctorId/patients/:patientId/history',
+  authenticateToken,
+  authorizeRoles('doctor'),
+  asyncHandler(getPatientHistoryForDoctor)
 );
 router.post(
   '/:id/availability',

@@ -3,6 +3,8 @@ const {
   updateAboutContent,
   getSiteSettings,
   updateSiteSettings,
+  getHomeHeroContent,
+  updateHomeHeroContent,
   getServicePackages,
   createServicePackage,
   updateServicePackage,
@@ -26,6 +28,16 @@ async function fetchSiteSettings(_req, res) {
 
 async function saveSiteSettings(req, res) {
   const updated = await updateSiteSettings(req.body);
+  res.json(updated);
+}
+
+async function fetchHomeHero(_req, res) {
+  const hero = await getHomeHeroContent();
+  res.json(hero);
+}
+
+async function saveHomeHero(req, res) {
+  const updated = await updateHomeHeroContent(req.body);
   res.json(updated);
 }
 
@@ -70,6 +82,8 @@ module.exports = {
   saveAboutContent,
   fetchSiteSettings,
   saveSiteSettings,
+  fetchHomeHero,
+  saveHomeHero,
   fetchServicePackages,
   createPackage,
   updatePackage,

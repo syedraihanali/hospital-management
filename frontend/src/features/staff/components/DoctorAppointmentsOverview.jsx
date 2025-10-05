@@ -26,6 +26,7 @@ function DoctorAppointmentsOverview({
   statusFeedback,
   onUpdateStatus,
   onComposeReport,
+  onViewPatientHistory,
 }) {
   const navigate = useNavigate();
 
@@ -69,6 +70,12 @@ function DoctorAppointmentsOverview({
               ? appointment.PatientDocuments
               : [];
 
+            const viewHistory = () => {
+              if (onViewPatientHistory) {
+                onViewPatientHistory(appointment.PatientID);
+              }
+            };
+
             return (
               <article
                 key={appointment.AppointmentID}
@@ -76,7 +83,13 @@ function DoctorAppointmentsOverview({
               >
                 <div className="space-y-2">
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-900">{appointment.PatientName}</h3>
+                    <button
+                      type="button"
+                      onClick={viewHistory}
+                      className="text-left text-sm font-semibold text-brand-primary transition hover:text-brand-dark"
+                    >
+                      {appointment.PatientName}
+                    </button>
                     <p className="text-xs text-slate-600">Phone: {appointment.PhoneNumber || 'N/A'}</p>
                     <p className="mt-1 text-xs text-slate-500">
                       {formatAppointmentDate(appointment.ScheduleDate, appointment.StartTime)} — {appointment.EndTime}
@@ -169,6 +182,13 @@ function DoctorAppointmentsOverview({
                         Send report
                       </button>
                     ) : null}
+                    <button
+                      type="button"
+                      onClick={viewHistory}
+                      className="rounded-full border border-brand-primary/40 px-3 py-2 font-semibold text-brand-primary transition hover:bg-brand-primary hover:text-white"
+                    >
+                      View history
+                    </button>
                   </div>
                 </div>
               </article>
@@ -205,11 +225,13 @@ DoctorAppointmentsOverview.propTypes = {
   }),
   onUpdateStatus: PropTypes.func.isRequired,
   onComposeReport: PropTypes.func,
+  onViewPatientHistory: PropTypes.func,
 };
 
 DoctorAppointmentsOverview.defaultProps = {
   statusFeedback: null,
   onComposeReport: undefined,
+  onViewPatientHistory: undefined,
 };
 
 export default DoctorAppointmentsOverview;

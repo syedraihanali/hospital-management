@@ -6,12 +6,17 @@ const {
   getOverview,
   getDoctorApplications,
   reviewDoctorApplicationHandler,
+  searchDoctorsDirectoryHandler,
+  getDoctorDirectoryProfile,
+  getDoctorAppointmentsForAdminHandler,
 } = require('../controllers/adminController');
 const {
   fetchAboutContent,
   saveAboutContent,
   fetchSiteSettings,
   saveSiteSettings,
+  fetchHomeHero,
+  saveHomeHero,
   fetchServicePackages,
   createPackage,
   updatePackage,
@@ -32,6 +37,24 @@ router.post(
   authenticateToken,
   authorizeRoles('admin'),
   asyncHandler(reviewDoctorApplicationHandler)
+);
+router.get(
+  '/doctors',
+  authenticateToken,
+  authorizeRoles('admin'),
+  asyncHandler(searchDoctorsDirectoryHandler)
+);
+router.get(
+  '/doctors/:id/profile',
+  authenticateToken,
+  authorizeRoles('admin'),
+  asyncHandler(getDoctorDirectoryProfile)
+);
+router.get(
+  '/doctors/:id/appointments',
+  authenticateToken,
+  authorizeRoles('admin'),
+  asyncHandler(getDoctorAppointmentsForAdminHandler)
 );
 router.get(
   '/content/about',
@@ -56,6 +79,18 @@ router.put(
   authenticateToken,
   authorizeRoles('admin'),
   asyncHandler(saveSiteSettings)
+);
+router.get(
+  '/content/home-hero',
+  authenticateToken,
+  authorizeRoles('admin'),
+  asyncHandler(fetchHomeHero)
+);
+router.put(
+  '/content/home-hero',
+  authenticateToken,
+  authorizeRoles('admin'),
+  asyncHandler(saveHomeHero)
 );
 router.get(
   '/content/service-packages',

@@ -1,15 +1,17 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { FaUserMd } from 'react-icons/fa';
 import { AuthContext } from '../../auth/context/AuthContext';
 import DoctorAppointmentsOverview from '../components/DoctorAppointmentsOverview';
 import DoctorReportCenter from '../components/DoctorReportCenter';
 import DoctorAvailabilityPlanner from '../components/DoctorAvailabilityPlanner';
 import DoctorProfileSettings from '../components/DoctorProfileSettings';
+import DoctorPatientHistory from '../components/DoctorPatientHistory';
 
 function StaffPortal() {
   const { auth } = useContext(AuthContext);
   const doctorId = auth.user?.id;
+  const navigate = useNavigate();
   const apiBaseUrl = (process.env.REACT_APP_API_URL || '').replace(/\/$/, '');
 
   const [doctorProfile, setDoctorProfile] = useState(null);
@@ -456,6 +458,13 @@ function StaffPortal() {
     }));
   };
 
+  const handleViewPatientHistory = (patientId) => {
+    if (!patientId) {
+      return;
+    }
+    navigate(`patients/${patientId}`);
+  };
+
   const handleReportSubmit = async (event) => {
     event.preventDefault();
     if (!reportForm.appointmentId || !reportForm.title || !reportForm.file) {
@@ -667,6 +676,7 @@ function StaffPortal() {
               statusFeedback={statusFeedback}
               onUpdateStatus={handleAppointmentStatus}
               onComposeReport={handleStartReport}
+              onViewPatientHistory={handleViewPatientHistory}
             />
           }
         />
@@ -719,6 +729,10 @@ function StaffPortal() {
               passwordFeedback={passwordFeedback}
             />
           }
+        />
+        <Route
+          path="patients/:patientId"
+          element={<DoctorPatientHistory token={auth.token} doctorId={doctorId} />}
         />
         <Route path="*" element={<Navigate to="." replace />} />
       </Routes>

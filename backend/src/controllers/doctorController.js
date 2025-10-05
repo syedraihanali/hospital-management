@@ -9,15 +9,22 @@ const {
   getAvailableTimes,
   createAvailabilitySlots,
   listAppointmentsForDoctor,
+  listAppointmentsForPatient,
   updateAppointmentStatus,
   getAppointmentById,
   reopenAvailabilitySlot,
   listAvailabilityForDoctorManagement,
   updateAvailabilitySlotStatus,
   hasActiveAppointmentForSlot,
+  hasDoctorSeenPatient,
 } = require('../services/appointmentService');
 const { createDoctorReport } = require('../services/reportService');
 const { storeFile } = require('../services/storageService');
+const {
+  findPatientById,
+  listPatientDocuments,
+  listPatientReports,
+} = require('../services/patientService');
 
 // Returns the catalog of doctors available in the clinic.
 async function getDoctors(_req, res) {
@@ -294,6 +301,37 @@ async function changeDoctorPassword(req, res) {
   return res.json({ message: 'Password updated successfully.' });
 }
 
+async function getPatientHistoryForDoctor(req, res) {
+  const doctorId = Number.parseInt(req.params.doctorId, 10);
+  const patientId = Number.parseInt(req.params.patientId, 10);
+
+  if (req.user.role !== 'doctor' || req.user.id !== doctorId) {
+    return res.status(403).json({ message: 'Access denied.' });
+  }
+
+  if (Number.isNaN(patientId)) {
+    return res.status(400).json({ message: 'Invalid patient identifier.' });
+  }
+
+  const patient = await findPatientById(patientId);
+  if (!patient) {
+    return res.status(404).json({ message: 'Patient not found.' });
+  }
+
+  const hasRelationship = await hasDoctorSeenPatient(doctorId, patientId);
+  if (!hasRelationship) {
+    return res.status(404).json({ message: 'No appointments found for this patient.' });
+  }
+
+  const [appointments, documents, reports] = await Promise.all([
+    listAppointmentsForPatient(patientId),
+    listPatientDocuments(patientId, { sort: 'desc' }),
+    listPatientReports(patientId, { sort: 'desc' }),
+  ]);
+
+  return res.json({ patient, appointments, documents, reports });
+}
+
 module.exports = {
   getDoctors,
   getDoctorAvailability,
@@ -307,4 +345,5 @@ module.exports = {
   updateDoctorProfileHandler,
   changeDoctorPassword,
   getDoctorProfile,
+  getPatientHistoryForDoctor,
 };

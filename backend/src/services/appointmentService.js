@@ -235,6 +235,17 @@ async function listAppointmentsForPatient(patientId) {
   );
 }
 
+async function hasDoctorSeenPatient(doctorId, patientId) {
+  const rows = await execute(
+    `SELECT COUNT(*) AS total
+       FROM appointments
+       WHERE DoctorID = ? AND PatientID = ?`,
+    [doctorId, patientId]
+  );
+
+  return (rows[0]?.total || 0) > 0;
+}
+
 async function updateAppointmentStatus(appointmentId, status, notes = null) {
   await execute(
     `UPDATE appointments SET Status = ?, Notes = ?, UpdatedAt = CURRENT_TIMESTAMP WHERE AppointmentID = ?`,
@@ -260,6 +271,7 @@ module.exports = {
   createAvailabilitySlots,
   listAppointmentsForDoctor,
   listAppointmentsForPatient,
+  hasDoctorSeenPatient,
   updateAppointmentStatus,
   getAppointmentById,
   reopenAvailabilitySlot,
