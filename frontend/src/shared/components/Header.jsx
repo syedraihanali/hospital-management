@@ -48,17 +48,9 @@ function Header() {
           { label: 'About Us', to: '/about-us' },
         ];
       case 'doctor':
-        return [
-          { label: 'Home', to: '/' },
-          { label: 'Services', to: '/services' },
-          { label: 'About Us', to: '/about-us' },
-        ];
+        return [{ label: 'Dashboard', to: dashboardLink.path }];
       case 'admin':
-        return [
-          { label: 'Home', to: '/' },
-          { label: 'Services', to: '/services' },
-          { label: 'About Us', to: '/about-us' },
-        ];
+        return [{ label: 'Dashboard', to: dashboardLink.path }];
       default:
         return [
           { label: 'Home', to: '/' },

@@ -32,6 +32,8 @@ function App() {
   };
 
   const defaultRedirect = getDefaultRoute(auth.user?.role);
+  const isManagementUser = auth.token && ['doctor', 'admin'].includes(auth.user?.role);
+  const guardPublicPage = (page) => (isManagementUser ? <Navigate to={defaultRedirect} replace /> : page);
 
   return (
     <Router>
@@ -40,12 +42,12 @@ function App() {
           <Header />
           <main className="flex-1 px-4 pb-12 pt-28 sm:px-8">
             <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/about-us" element={<AboutUs />} />
-              <Route path="/services" element={<ServicesPage />} />
-              <Route path="/reports" element={<ReportsPage />} />
-              <Route path="/apply-as-doctor" element={<DoctorApplicationPage />} />
+              <Route path="/" element={guardPublicPage(<HomePage />)} />
+              <Route path="/register" element={guardPublicPage(<RegisterPage />)} />
+              <Route path="/about-us" element={guardPublicPage(<AboutUs />)} />
+              <Route path="/services" element={guardPublicPage(<ServicesPage />)} />
+              <Route path="/reports" element={guardPublicPage(<ReportsPage />)} />
+              <Route path="/apply-as-doctor" element={guardPublicPage(<DoctorApplicationPage />)} />
               <Route
                 path="/signin"
                 element={!auth.token ? <SignInLandingPage /> : <Navigate to={defaultRedirect} />}

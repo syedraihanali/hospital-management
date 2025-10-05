@@ -124,6 +124,43 @@ async function createAvailabilitySlots(doctorId, slots) {
   );
 }
 
+async function listAvailabilityForDoctorManagement(doctorId) {
+  return execute(
+    `SELECT
+        AvailableTimeID,
+        DoctorID,
+        DATE_FORMAT(ScheduleDate, '%Y-%m-%d') AS ScheduleDate,
+        TIME_FORMAT(StartTime, '%H:%i') AS StartTime,
+        TIME_FORMAT(EndTime, '%H:%i') AS EndTime,
+        IsAvailable
+      FROM available_time
+      WHERE DoctorID = ? AND ScheduleDate >= CURDATE()
+      ORDER BY ScheduleDate ASC, StartTime ASC`,
+    [doctorId]
+  );
+}
+
+async function updateAvailabilitySlotStatus(slotId, doctorId, isAvailable) {
+  const result = await execute(
+    'UPDATE available_time SET IsAvailable = ? WHERE AvailableTimeID = ? AND DoctorID = ?',
+    [isAvailable ? 1 : 0, slotId, doctorId]
+  );
+
+  return result.affectedRows || 0;
+}
+
+async function hasActiveAppointmentForSlot(slotId) {
+  const result = await execute(
+    `SELECT COUNT(*) AS total
+       FROM appointments
+       WHERE AvailableTimeID = ?
+         AND Status IN ('pending', 'confirmed')`,
+    [slotId]
+  );
+
+  return (result[0]?.total || 0) > 0;
+}
+
 async function listAppointmentsForDoctor(doctorId) {
   return execute(
     `SELECT
@@ -195,4 +232,7 @@ module.exports = {
   updateAppointmentStatus,
   getAppointmentById,
   reopenAvailabilitySlot,
+  listAvailabilityForDoctorManagement,
+  updateAvailabilitySlotStatus,
+  hasActiveAppointmentForSlot,
 };

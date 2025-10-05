@@ -14,6 +14,8 @@ const {
   updateDoctorProfileHandler,
   changeDoctorPassword,
   getDoctorProfile,
+  getDoctorAvailabilityForManagement,
+  updateDoctorAvailabilityStatus,
 } = require('../controllers/doctorController');
 
 const router = Router();
@@ -37,6 +39,12 @@ router.get(
   asyncHandler(getDoctorAppointments)
 );
 router.get(
+  '/:id/availability/manage',
+  authenticateToken,
+  authorizeRoles('doctor'),
+  asyncHandler(getDoctorAvailabilityForManagement)
+);
+router.get(
   '/:id/profile',
   authenticateToken,
   authorizeRoles('doctor', 'admin'),
@@ -47,6 +55,12 @@ router.post(
   authenticateToken,
   authorizeRoles('doctor'),
   asyncHandler(addAvailability)
+);
+router.patch(
+  '/:doctorId/availability/:slotId',
+  authenticateToken,
+  authorizeRoles('doctor'),
+  asyncHandler(updateDoctorAvailabilityStatus)
 );
 router.patch(
   '/appointments/:appointmentId/status',

@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { AuthContext } from '../../auth/context/AuthContext';
-import { FaCalendarCheck, FaUserMd } from 'react-icons/fa';
+import { FaBan, FaCalendarCheck, FaCalendarPlus, FaUndo, FaUserMd } from 'react-icons/fa';
 
 function StaffPortal() {
   const { auth } = useContext(AuthContext);
@@ -11,7 +11,20 @@ function StaffPortal() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [availabilityForm, setAvailabilityForm] = useState({ date: '', startTime: '', endTime: '' });
+  const createDefaultPlannerState = () => ({
+    selectedDays: [],
+    customDates: [],
+    customDateInput: '',
+    startTime: '09:00',
+    endTime: '17:00',
+    useCustomTime: false,
+    customStartTime: '',
+    customEndTime: '',
+  });
+  const [availabilityPlanner, setAvailabilityPlanner] = useState(createDefaultPlannerState);
+  const [availabilitySlots, setAvailabilitySlots] = useState([]);
+  const [availabilityLoading, setAvailabilityLoading] = useState(true);
+  const [availabilityError, setAvailabilityError] = useState('');
   const [availabilityFeedback, setAvailabilityFeedback] = useState(null);
   const [statusFeedback, setStatusFeedback] = useState(null);
   const [reportForm, setReportForm] = useState({ appointmentId: null, title: '', description: '', file: null });
@@ -21,6 +34,83 @@ function StaffPortal() {
   const [passwordValue, setPasswordValue] = useState('');
   const [passwordFeedback, setPasswordFeedback] = useState(null);
 
+  const dayOptions = [
+    { value: 0, label: 'Sun' },
+    { value: 1, label: 'Mon' },
+    { value: 2, label: 'Tue' },
+    { value: 3, label: 'Wed' },
+    { value: 4, label: 'Thu' },
+    { value: 5, label: 'Fri' },
+    { value: 6, label: 'Sat' },
+  ];
+
+  const startTimeOptions = useMemo(
+    () =>
+      Array.from({ length: 16 }, (_value, index) => {
+        const hour = 6 + index;
+        return `${hour.toString().padStart(2, '0')}:00`;
+      }),
+    []
+  );
+
+  const endTimeOptions = useMemo(
+    () =>
+      Array.from({ length: 16 }, (_value, index) => {
+        const hour = 7 + index;
+        return `${hour.toString().padStart(2, '0')}:00`;
+      }),
+    []
+  );
+
+  const formatTimeLabel = (time) =>
+    new Date(`1970-01-01T${time}:00`).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+
+  const parseTimeToMinutes = (time) => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+
+  const formatDateValue = (date) => {
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const loadAvailability = async () => {
+    if (!doctorId || !auth.token) {
+      setAvailabilitySlots([]);
+      setAvailabilityLoading(false);
+      return;
+    }
+
+    setAvailabilityLoading(true);
+    setAvailabilityError('');
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/doctors/${doctorId}/availability/manage`, {
+        headers: {
+          Authorization: `Bearer ${auth.token}`,
+        },
+      });
+
+      const data = await response.json().catch(() => []);
+
+      if (!response.ok) {
+        throw new Error(data?.message || 'Unable to load availability schedule.');
+      }
+
+      setAvailabilitySlots(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setAvailabilityError(err.message || 'Failed to load availability schedule.');
+    } finally {
+      setAvailabilityLoading(false);
+    }
+  };
+
   const fetchDoctorData = async () => {
     if (!doctorId || !auth.token) {
       return;
@@ -28,6 +118,7 @@ function StaffPortal() {
 
     setLoading(true);
     setError('');
+    setAvailabilityFeedback(null);
 
     try {
       const [profileRes, appointmentsRes] = await Promise.all([
@@ -62,6 +153,7 @@ function StaffPortal() {
         avatarUrl: profileData.AvatarUrl || '',
         avatarFile: null,
       });
+      await loadAvailability();
     } catch (err) {
       setError(err.message || 'Failed to load your dashboard.');
     } finally {
@@ -99,47 +191,248 @@ function StaffPortal() {
     [appointments]
   );
 
-  const handleAvailabilityChange = (event) => {
+  const sortedAvailabilitySlots = useMemo(
+    () =>
+      [...availabilitySlots].sort(
+        (a, b) =>
+          new Date(`${a.ScheduleDate}T${a.StartTime}`) - new Date(`${b.ScheduleDate}T${b.StartTime}`)
+      ),
+    [availabilitySlots]
+  );
+
+  const toggleDaySelection = (dayValue) => {
+    setAvailabilityPlanner((prev) => {
+      const alreadySelected = prev.selectedDays.includes(dayValue);
+      const updatedDays = alreadySelected
+        ? prev.selectedDays.filter((value) => value !== dayValue)
+        : [...prev.selectedDays, dayValue];
+      updatedDays.sort((a, b) => a - b);
+      return { ...prev, selectedDays: updatedDays };
+    });
+  };
+
+  const handleSelectAllDays = () => {
+    setAvailabilityPlanner((prev) => ({
+      ...prev,
+      selectedDays: dayOptions.map((day) => day.value),
+    }));
+  };
+
+  const handleClearDays = () => {
+    setAvailabilityPlanner((prev) => ({ ...prev, selectedDays: [] }));
+  };
+
+  const handlePlannerFieldChange = (event) => {
     const { name, value } = event.target;
-    setAvailabilityForm((prev) => ({ ...prev, [name]: value }));
+    setAvailabilityPlanner((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleCustomTimeToggle = (event) => {
+    const useCustomTime = event.target.checked;
+    setAvailabilityPlanner((prev) => ({
+      ...prev,
+      useCustomTime,
+      customStartTime: useCustomTime ? prev.customStartTime || prev.startTime : prev.customStartTime,
+      customEndTime: useCustomTime ? prev.customEndTime || prev.endTime : prev.customEndTime,
+    }));
+  };
+
+  const handleCustomDateInputChange = (event) => {
+    setAvailabilityPlanner((prev) => ({ ...prev, customDateInput: event.target.value }));
+  };
+
+  const handleAddCustomDate = () => {
+    const dateValue = availabilityPlanner.customDateInput;
+    if (!dateValue) {
+      return;
+    }
+
+    const selectedDate = new Date(dateValue);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (Number.isNaN(selectedDate.getTime()) || selectedDate < today) {
+      setAvailabilityFeedback({ type: 'error', message: 'Choose a future date for custom availability.' });
+      return;
+    }
+
+    if (availabilityPlanner.customDates.includes(dateValue)) {
+      setAvailabilityPlanner((prev) => ({ ...prev, customDateInput: '' }));
+      return;
+    }
+
+    setAvailabilityPlanner((prev) => ({
+      ...prev,
+      customDates: [...prev.customDates, dateValue].sort(),
+      customDateInput: '',
+    }));
+  };
+
+  const handleRemoveCustomDate = (date) => {
+    setAvailabilityPlanner((prev) => ({
+      ...prev,
+      customDates: prev.customDates.filter((item) => item !== date),
+    }));
   };
 
   const handleAvailabilitySubmit = async (event) => {
     event.preventDefault();
     setAvailabilityFeedback(null);
 
-    if (!availabilityForm.date || !availabilityForm.startTime || !availabilityForm.endTime) {
-      setAvailabilityFeedback({ type: 'error', message: 'Provide a date and time window.' });
+    const {
+      selectedDays,
+      customDates,
+      startTime,
+      endTime,
+      useCustomTime,
+      customStartTime,
+      customEndTime,
+    } = availabilityPlanner;
+
+    const startValue = useCustomTime ? customStartTime : startTime;
+    const endValue = useCustomTime ? customEndTime : endTime;
+
+    if (!startValue || !endValue) {
+      setAvailabilityFeedback({ type: 'error', message: 'Select both a start time and an end time.' });
+      return;
+    }
+
+    if (parseTimeToMinutes(endValue) <= parseTimeToMinutes(startValue)) {
+      setAvailabilityFeedback({ type: 'error', message: 'End time must be later than the start time.' });
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDatesSet = new Set(customDates);
+
+    if (selectedDays.length) {
+      for (let offset = 0; offset < 28; offset += 1) {
+        const candidate = new Date(today);
+        candidate.setDate(today.getDate() + offset);
+        if (selectedDays.includes(candidate.getDay())) {
+          selectedDatesSet.add(formatDateValue(candidate));
+        }
+      }
+    }
+
+    const plannedDates = [...selectedDatesSet]
+      .map((dateString) => dateString)
+      .filter((dateString) => {
+        const parsed = new Date(dateString);
+        return !Number.isNaN(parsed.getTime()) && parsed >= today;
+      })
+      .sort();
+
+    if (!plannedDates.length) {
+      setAvailabilityFeedback({ type: 'error', message: 'Select at least one day or custom date.' });
+      return;
+    }
+
+    const availabilityMap = new Map(
+      availabilitySlots.map((slot) => [
+        `${slot.ScheduleDate}|${slot.StartTime}|${slot.EndTime}`,
+        slot,
+      ])
+    );
+
+    const slotsToCreate = [];
+    const slotsToRestore = [];
+
+    plannedDates.forEach((date) => {
+      const key = `${date}|${startValue}|${endValue}`;
+      const existingSlot = availabilityMap.get(key);
+      if (!existingSlot) {
+        slotsToCreate.push({ date, startTime: startValue, endTime: endValue });
+      } else if (!existingSlot.IsAvailable) {
+        slotsToRestore.push(existingSlot.AvailableTimeID);
+      }
+    });
+
+    if (!slotsToCreate.length && !slotsToRestore.length) {
+      setAvailabilityFeedback({ type: 'error', message: 'Those availability slots already exist.' });
       return;
     }
 
     try {
-      const response = await fetch(`${apiBaseUrl}/api/doctors/${doctorId}/availability`, {
-        method: 'POST',
+      if (slotsToCreate.length) {
+        const response = await fetch(`${apiBaseUrl}/api/doctors/${doctorId}/availability`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${auth.token}`,
+          },
+          body: JSON.stringify({ slots: slotsToCreate }),
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(data.error || data.message || 'Unable to add availability.');
+        }
+      }
+
+      if (slotsToRestore.length) {
+        await Promise.all(
+          slotsToRestore.map(async (slotId) => {
+            const response = await fetch(
+              `${apiBaseUrl}/api/doctors/${doctorId}/availability/${slotId}`,
+              {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${auth.token}`,
+                },
+                body: JSON.stringify({ isAvailable: true }),
+              }
+            );
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              throw new Error(payload.error || payload.message || 'Unable to update availability.');
+            }
+          })
+        );
+      }
+
+      const totalUpdated = slotsToCreate.length + slotsToRestore.length;
+      setAvailabilityFeedback({
+        type: 'success',
+        message: `Availability updated for ${totalUpdated} slot${totalUpdated === 1 ? '' : 's'}.`,
+      });
+      setAvailabilityPlanner((prev) => ({ ...prev, customDates: [], customDateInput: '' }));
+      await loadAvailability();
+    } catch (err) {
+      setAvailabilityFeedback({ type: 'error', message: err.message || 'Failed to update availability.' });
+    }
+  };
+
+  const handleToggleSlotAvailability = async (slotId, makeAvailable) => {
+    setAvailabilityFeedback(null);
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/doctors/${doctorId}/availability/${slotId}`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${auth.token}`,
         },
-        body: JSON.stringify({
-          slots: [
-            {
-              date: availabilityForm.date,
-              startTime: availabilityForm.startTime,
-              endTime: availabilityForm.endTime,
-            },
-          ],
-        }),
+        body: JSON.stringify({ isAvailable: makeAvailable }),
       });
 
+      const data = await response.json().catch(() => ({}));
+
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || data.message || 'Unable to add availability.');
+        throw new Error(data.error || data.message || 'Unable to update availability.');
       }
 
-      setAvailabilityForm({ date: '', startTime: '', endTime: '' });
-      setAvailabilityFeedback({ type: 'success', message: 'Availability slot added successfully.' });
+      setAvailabilityFeedback({
+        type: 'success',
+        message: data.message || 'Availability updated successfully.',
+      });
+      await loadAvailability();
     } catch (err) {
-      setAvailabilityFeedback({ type: 'error', message: err.message || 'Failed to add availability.' });
+      setAvailabilityFeedback({ type: 'error', message: err.message || 'Failed to update availability.' });
     }
   };
 
@@ -459,7 +752,17 @@ function StaffPortal() {
           </div>
 
           <div className="mt-8 border-t border-slate-200 pt-6">
-            <h3 className="text-lg font-semibold text-brand-primary">Add availability</h3>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-brand-primary">
+                  <FaCalendarPlus aria-hidden="true" />
+                  Plan your availability
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Select weekly days or custom dates, then choose the hours you are available for appointments.
+                </p>
+              </div>
+            </div>
             {availabilityFeedback ? (
               <div
                 className={`mt-3 rounded-xl border px-4 py-3 text-sm ${
@@ -471,49 +774,233 @@ function StaffPortal() {
                 {availabilityFeedback.message}
               </div>
             ) : null}
-            <form className="mt-3 grid gap-3 sm:grid-cols-3" onSubmit={handleAvailabilitySubmit}>
-              <label className="flex flex-col text-xs font-semibold text-slate-600">
-                Date
-                <input
-                  type="date"
-                  name="date"
-                  value={availabilityForm.date}
-                  onChange={handleAvailabilityChange}
-                  required
-                  className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                />
-              </label>
-              <label className="flex flex-col text-xs font-semibold text-slate-600">
-                Start time
-                <input
-                  type="time"
-                  name="startTime"
-                  value={availabilityForm.startTime}
-                  onChange={handleAvailabilityChange}
-                  required
-                  className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                />
-              </label>
-              <label className="flex flex-col text-xs font-semibold text-slate-600">
-                End time
-                <input
-                  type="time"
-                  name="endTime"
-                  value={availabilityForm.endTime}
-                  onChange={handleAvailabilityChange}
-                  required
-                  className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                />
-              </label>
-              <div className="sm:col-span-3">
-                <button
-                  type="submit"
-                  className="inline-flex items-center justify-center rounded-full bg-brand-primary px-6 py-2 text-sm font-semibold text-white shadow hover:bg-brand-dark"
-                >
-                  Add slot
-                </button>
+            <form className="mt-4 space-y-5" onSubmit={handleAvailabilitySubmit}>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Days of the week</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {dayOptions.map((day) => {
+                    const isSelected = availabilityPlanner.selectedDays.includes(day.value);
+                    return (
+                      <button
+                        type="button"
+                        key={day.value}
+                        onClick={() => toggleDaySelection(day.value)}
+                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                          isSelected
+                            ? 'border-brand-primary bg-brand-primary/15 text-brand-dark shadow-sm'
+                            : 'border-slate-300 text-slate-600 hover:border-brand-primary hover:text-brand-dark'
+                        }`}
+                      >
+                        {day.label}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={handleSelectAllDays}
+                    className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:border-brand-primary hover:text-brand-dark"
+                  >
+                    Select all
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearDays}
+                    className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:border-rose-300 hover:text-rose-600"
+                  >
+                    Clear
+                  </button>
+                </div>
               </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Custom dates</p>
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <input
+                    type="date"
+                    value={availabilityPlanner.customDateInput}
+                    onChange={handleCustomDateInputChange}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent sm:max-w-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomDate}
+                    className="inline-flex items-center justify-center rounded-full border border-brand-primary px-4 py-2 text-xs font-semibold text-brand-primary transition hover:bg-brand-primary hover:text-white"
+                  >
+                    Add date
+                  </button>
+                </div>
+                {availabilityPlanner.customDates.length ? (
+                  <ul className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
+                    {availabilityPlanner.customDates.map((date) => (
+                      <li
+                        key={date}
+                        className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1"
+                      >
+                        <span>
+                          {new Date(`${date}T00:00`).toLocaleDateString('en-US', {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCustomDate(date)}
+                          className="text-slate-400 transition hover:text-rose-500"
+                          aria-label={`Remove ${date}`}
+                        >
+                          &times;
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-xs text-slate-400">Optional: select specific dates outside your weekly routine.</p>
+                )}
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="flex flex-col text-xs font-semibold text-slate-600">
+                  Start time
+                  {availabilityPlanner.useCustomTime ? (
+                    <input
+                      type="time"
+                      name="customStartTime"
+                      value={availabilityPlanner.customStartTime || availabilityPlanner.startTime}
+                      onChange={handlePlannerFieldChange}
+                      required
+                      className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    />
+                  ) : (
+                    <select
+                      name="startTime"
+                      value={availabilityPlanner.startTime}
+                      onChange={handlePlannerFieldChange}
+                      className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    >
+                      {startTimeOptions.map((time) => (
+                        <option key={time} value={time}>
+                          {formatTimeLabel(time)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </label>
+                <label className="flex flex-col text-xs font-semibold text-slate-600">
+                  End time
+                  {availabilityPlanner.useCustomTime ? (
+                    <input
+                      type="time"
+                      name="customEndTime"
+                      value={availabilityPlanner.customEndTime || availabilityPlanner.endTime}
+                      onChange={handlePlannerFieldChange}
+                      required
+                      className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    />
+                  ) : (
+                    <select
+                      name="endTime"
+                      value={availabilityPlanner.endTime}
+                      onChange={handlePlannerFieldChange}
+                      className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    >
+                      {endTimeOptions.map((time) => (
+                        <option key={time} value={time}>
+                          {formatTimeLabel(time)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </label>
+              </div>
+
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={availabilityPlanner.useCustomTime}
+                  onChange={handleCustomTimeToggle}
+                  className="h-4 w-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
+                />
+                Use custom time inputs (for non-hourly schedules)
+              </label>
+
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-full bg-brand-primary px-6 py-2 text-sm font-semibold text-white shadow hover:bg-brand-dark"
+              >
+                Save availability
+              </button>
             </form>
+
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-white/80 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-sm font-semibold text-slate-700">Upcoming availability</h4>
+                <span className="text-xs text-slate-400">
+                  {availabilitySlots.length} slot{availabilitySlots.length === 1 ? '' : 's'} scheduled
+                </span>
+              </div>
+              {availabilityError ? (
+                <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600">
+                  {availabilityError}
+                </div>
+              ) : null}
+              {availabilityLoading ? (
+                <p className="mt-3 text-xs text-slate-500">Loading availability...</p>
+              ) : sortedAvailabilitySlots.length === 0 ? (
+                <p className="mt-3 text-xs text-slate-500">
+                  You have not set any availability yet. Add weekly days or custom dates to get appointment requests.
+                </p>
+              ) : (
+                <ul className="mt-4 max-h-64 space-y-2 overflow-y-auto pr-1">
+                  {sortedAvailabilitySlots.map((slot) => {
+                    const isAvailable = Boolean(slot.IsAvailable);
+                    const slotDate = new Date(`${slot.ScheduleDate}T00:00`);
+                    return (
+                      <li
+                        key={slot.AvailableTimeID}
+                        className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div>
+                          <p className="font-semibold text-slate-700">
+                            {slotDate.toLocaleDateString('en-US', {
+                              weekday: 'short',
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {formatTimeLabel(slot.StartTime)} — {formatTimeLabel(slot.EndTime)}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold ${
+                              isAvailable
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-slate-200 text-slate-600'
+                            }`}
+                          >
+                            {isAvailable ? 'Available' : 'Unavailable'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSlotAvailability(slot.AvailableTimeID, !isAvailable)}
+                            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 font-semibold transition ${
+                              isAvailable
+                                ? 'border border-rose-300 text-rose-600 hover:bg-rose-50'
+                                : 'border border-emerald-300 text-emerald-600 hover:bg-emerald-50'
+                            }`}
+                          >
+                            {isAvailable ? <FaBan aria-hidden="true" /> : <FaUndo aria-hidden="true" />}
+                            {isAvailable ? 'Mark unavailable' : 'Restore'}
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
           </div>
         </article>
 
