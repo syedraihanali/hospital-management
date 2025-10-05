@@ -48,10 +48,14 @@ Create `backend/.env` with values suited to your environment:
 PORT=5001
 JWT_SECRET=change-me
 DB_HOST=localhost
+DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=your_mysql_password
 DB_NAME=hospital
 DB_CONNECTION_LIMIT=10
+DB_CONNECT_TIMEOUT_MS=10000
+DB_RETRY_ATTEMPTS=5
+DB_RETRY_DELAY_MS=2000
 
 MINIO_ENDPOINT=128.199.31.100
 MINIO_PORT=9000
@@ -63,6 +67,7 @@ MINIO_PUBLIC_URL=http://128.199.31.100:9000
 ```
 
 > **Note:** On first run the server will verify that the configured bucket exists and will attempt to create it if missing.
+> Adjust the optional database timeout and retry variables if your MySQL service takes longer to become available.
 
 ### Install Dependencies
 

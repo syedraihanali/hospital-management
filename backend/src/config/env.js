@@ -19,10 +19,14 @@ const config = {
   },
   database: {
     host: process.env.DB_HOST || 'localhost',
+    port: Number.parseInt(process.env.DB_PORT, 10) || 3306,
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     name: process.env.DB_NAME || 'clinic',
     connectionLimit: Number.parseInt(process.env.DB_CONNECTION_LIMIT, 10) || 10,
+    connectTimeout: Number.parseInt(process.env.DB_CONNECT_TIMEOUT_MS, 10) || 10000,
+    retryAttempts: Number.parseInt(process.env.DB_RETRY_ATTEMPTS, 10) || 5,
+    retryDelayMs: Number.parseInt(process.env.DB_RETRY_DELAY_MS, 10) || 2000,
   },
   storage: {
     endpoint: process.env.MINIO_ENDPOINT || '127.0.0.1',
