@@ -16,6 +16,7 @@ import AdminDashboard from '../features/admin/pages/AdminDashboard';
 import { SiteSettingsProvider } from '../shared/context/SiteSettingsContext';
 import DoctorApplicationPage from '../features/staff/pages/DoctorApplicationPage';
 import SupportButtons from '../shared/components/SupportButtons';
+import MedicalHistoryPage from '../features/patient/pages/MedicalHistoryPage';
 
 function App() {
   const { auth } = useContext(AuthContext);
@@ -59,13 +60,10 @@ function App() {
               <Route
                 path="/book-appointment"
                 element={
-                  auth.token && auth.user?.role === 'patient' ? (
-                    <BookAppointmentPage />
-                  ) : (
-                    <Navigate to={auth.token ? defaultRedirect : '/signin/patient'} />
-                  )
+                  isManagementUser ? <Navigate to={defaultRedirect} replace /> : <BookAppointmentPage />
                 }
               />
+              <Route path="/medical-history" element={guardPublicPage(<MedicalHistoryPage />)} />
               <Route
                 path="/staff-portal/*"
                 element={
