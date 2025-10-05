@@ -47,22 +47,28 @@ Create `backend/.env` with values suited to your environment:
 ```
 PORT=5001
 JWT_SECRET=change-me
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=your_mysql_password
-DB_NAME=hospital
+DB_HOST=db
+DB_PORT=3306
+DB_USER=clinicuser
+DB_PASSWORD=clinic1122
+DB_NAME=clinic
 DB_CONNECTION_LIMIT=10
+DB_CONNECT_TIMEOUT_MS=10000
+DB_RETRY_ATTEMPTS=5
+DB_RETRY_DELAY_MS=2000
 
-MINIO_ENDPOINT=128.199.31.100
+MINIO_ENDPOINT=minio
 MINIO_PORT=9000
 MINIO_ACCESS_KEY=tahir
 MINIO_SECRET_KEY=Raihan12
 MINIO_BUCKET=hospital-data
 MINIO_USE_SSL=false
-MINIO_PUBLIC_URL=http://128.199.31.100:9000
+MINIO_PUBLIC_URL=http://localhost:9000
 ```
 
 > **Note:** On first run the server will verify that the configured bucket exists and will attempt to create it if missing.
+> Adjust the optional database timeout and retry variables if your MySQL service takes longer to become available.
+> Update `MINIO_PUBLIC_URL` to a publicly reachable host (for example `https://your-domain:9000`) if clients need to access files from outside the Docker network.
 
 ### Install Dependencies
 
@@ -78,7 +84,8 @@ npm install
 
 ### Database Setup
 
-1. Create the target database (`DB_NAME`) in MySQL if it does not exist.
+1. Create the target database (`DB_NAME`) in MySQL if it does not exist. When using the provided Docker Compose setup this
+   database is provisioned automatically on the `db` service.
 2. Start the backend server once – it will automatically create/alter tables and seed:
    - sample doctors, patients, and users
    - default admin account (`admin@hospital.com` / `Admin@123`)
@@ -88,13 +95,22 @@ npm install
 ### Running the Apps
 
 ```bash
-# Terminal 1 – start the API
-cd backend
-npm start
+# Provision the full stack with Docker
+docker compose up --build
+```
 
-# Terminal 2 – start the React dev server
-cd frontend
-npm start
+This starts four containers:
+
+- `db` – MySQL 8 with the credentials from `backend/.env`
+- `minio` – S3-compatible object storage used for file uploads
+- `backend` – the Express API
+- `frontend` – the production React bundle served by Nginx
+
+By default the production frontend bundle is built with `REACT_APP_API_URL` pointing to `http://localhost:5001`. Override this by
+passing an environment variable when running Compose if your API is exposed at a different host (for example on a remote VPS):
+
+```bash
+REACT_APP_API_URL="https://api.your-domain.com" docker compose up --build
 ```
 
 The React app defaults to `http://localhost:3000` and proxies API calls to the URL configured via `REACT_APP_API_URL` (configure in `frontend/.env` if required).
