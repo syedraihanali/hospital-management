@@ -31,7 +31,7 @@ const config = {
     secretKey: process.env.MINIO_SECRET_KEY || '',
     bucket: process.env.MINIO_BUCKET || 'hospital-data',
     useSSL: String(process.env.MINIO_USE_SSL || 'false').toLowerCase() === 'true',
-    publicUrl: process.env.MINIO_PUBLIC_URL || null,
+    publicUrl: process.env.MINIO_PUBLIC_URL || '127.0.0.1',
   },
 };
 

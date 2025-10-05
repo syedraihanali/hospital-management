@@ -11,8 +11,29 @@ async function ensureBucketExists(client, bucket) {
 
 function getPublicUrl(objectName) {
   if (config.storage.publicUrl) {
-    const base = config.storage.publicUrl.replace(/\/$/, '');
-    return `${base}/${objectName}`;
+    const base = config.storage.publicUrl.replace(/\/+$/, '');
+    const bucket = config.storage.bucket;
+
+    let includesBucket = false;
+    try {
+      const url = new URL(base);
+      const [firstHostSegment] = url.hostname.split('.');
+      if (firstHostSegment === bucket) {
+        includesBucket = true;
+      }
+
+      const [firstPathSegment] = url.pathname.split('/').filter(Boolean);
+      if (firstPathSegment === bucket) {
+        includesBucket = true;
+      }
+    } catch (_error) {
+      if (base.includes(`${bucket}.`) || base.includes(`/${bucket}`)) {
+        includesBucket = true;
+      }
+    }
+
+    const path = [includesBucket ? null : bucket, objectName].filter(Boolean).join('/');
+    return `${base}/${path}`;
   }
   const protocol = config.storage.useSSL ? 'https' : 'http';
   return `${protocol}://${config.storage.endpoint}:${config.storage.port}/${config.storage.bucket}/${objectName}`;
