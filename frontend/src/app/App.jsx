@@ -1,21 +1,21 @@
 import React, { useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import HomePage from './pages/HomePage';
-import RegisterPage from './pages/RegisterPage';
-import PatientProfile from './pages/PatientProfile';
-import SignInPage from './pages/SignInPage';
-import SignInLandingPage from './pages/SignInLandingPage';
-import Header from './components/Header';
-import BookAppointmentPage from './pages/BookAppointmentPage';
-import StaffPortal from './pages/StaffPortal';
-import { AuthContext } from './AuthContext';
-import AboutUs from './pages/AboutUs';
-import ServicesPage from './pages/ServicesPage';
-import ReportsPage from './pages/ReportsPage';
-import AdminDashboard from './pages/AdminDashboard';
-import { SiteSettingsProvider } from './SiteSettingsContext';
-import DoctorApplicationPage from './pages/DoctorApplicationPage';
-import SupportButtons from './components/SupportButtons';
+import HomePage from '../features/home/pages/HomePage';
+import RegisterPage from '../features/auth/pages/RegisterPage';
+import PatientProfile from '../features/patient/pages/PatientProfile';
+import SignInPage from '../features/auth/pages/SignInPage';
+import SignInLandingPage from '../features/auth/pages/SignInLandingPage';
+import Header from '../shared/components/Header';
+import BookAppointmentPage from '../features/appointments/pages/BookAppointmentPage';
+import StaffPortal from '../features/staff/pages/StaffPortal';
+import { AuthContext } from '../features/auth/context/AuthContext';
+import AboutUs from '../features/about/pages/AboutUsPage';
+import ServicesPage from '../features/services/pages/ServicesPage';
+import ReportsPage from '../features/reports/pages/ReportsPage';
+import AdminDashboard from '../features/admin/pages/AdminDashboard';
+import { SiteSettingsProvider } from '../shared/context/SiteSettingsContext';
+import DoctorApplicationPage from '../features/staff/pages/DoctorApplicationPage';
+import SupportButtons from '../shared/components/SupportButtons';
 
 function App() {
   const { auth } = useContext(AuthContext);

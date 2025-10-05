@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../AuthContext';
+import { AuthContext } from '../../auth/context/AuthContext';
 
 function BookAppointmentPage() {
   const { auth } = useContext(AuthContext);

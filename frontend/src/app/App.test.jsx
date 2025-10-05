@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
-import { AuthProvider } from './AuthContext';
+import { AuthProvider } from '../features/auth/context/AuthContext';
 
 test('renders booking hero headline', () => {
   window.history.pushState({}, 'Home', '/Capstone-Project/');
