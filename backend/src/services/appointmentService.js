@@ -162,7 +162,7 @@ async function hasActiveAppointmentForSlot(slotId) {
 }
 
 async function listAppointmentsForDoctor(doctorId) {
-  return execute(
+  const rows = await execute(
     `SELECT
         a.AppointmentID,
         a.Status,
@@ -173,7 +173,19 @@ async function listAppointmentsForDoctor(doctorId) {
         p.PhoneNumber,
         DATE_FORMAT(at.ScheduleDate, '%Y-%m-%d') AS ScheduleDate,
         TIME_FORMAT(at.StartTime, '%H:%i') AS StartTime,
-        TIME_FORMAT(at.EndTime, '%H:%i') AS EndTime
+        TIME_FORMAT(at.EndTime, '%H:%i') AS EndTime,
+        (
+          SELECT JSON_ARRAYAGG(
+            JSON_OBJECT(
+              'DocumentID', pd.DocumentID,
+              'DocumentName', pd.DocumentName,
+              'FileUrl', pd.FileUrl,
+              'UploadedAt', DATE_FORMAT(pd.UploadedAt, '%Y-%m-%dT%H:%i:%sZ')
+            )
+          )
+          FROM patient_documents pd
+          WHERE pd.AppointmentID = a.AppointmentID
+        ) AS PatientDocuments
      FROM appointments a
      JOIN patients p ON a.PatientID = p.PatientID
      JOIN available_time at ON a.AvailableTimeID = at.AvailableTimeID
@@ -181,6 +193,25 @@ async function listAppointmentsForDoctor(doctorId) {
      ORDER BY at.ScheduleDate DESC, at.StartTime DESC`,
     [doctorId]
   );
+
+  return rows.map((appointment) => {
+    let patientDocuments = [];
+    if (appointment.PatientDocuments) {
+      try {
+        const parsed = JSON.parse(appointment.PatientDocuments);
+        if (Array.isArray(parsed)) {
+          patientDocuments = parsed;
+        }
+      } catch (error) {
+        patientDocuments = [];
+      }
+    }
+
+    return {
+      ...appointment,
+      PatientDocuments: patientDocuments,
+    };
+  });
 }
 
 async function listAppointmentsForPatient(patientId) {
