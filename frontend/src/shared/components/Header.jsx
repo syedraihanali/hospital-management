@@ -1,8 +1,8 @@
 import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../AuthContext';
+import { AuthContext } from '../../features/auth/context/AuthContext';
 import { FaBars, FaTimes } from 'react-icons/fa';
-import { useSiteSettings } from '../SiteSettingsContext';
+import { useSiteSettings } from '../context/SiteSettingsContext';
 
 function Header() {
   const { auth, logout } = useContext(AuthContext);

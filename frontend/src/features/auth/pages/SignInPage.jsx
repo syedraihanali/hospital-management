@@ -1,6 +1,6 @@
 import React, { useState, useContext, useEffect, useMemo } from 'react';
 import { useNavigate, Link, useParams } from 'react-router-dom';
-import { AuthContext } from '../AuthContext';
+import { AuthContext } from '../context/AuthContext';
 
 function SignInPage() {
   const { role: roleParam } = useParams();

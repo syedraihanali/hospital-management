@@ -1,6 +1,6 @@
 import React from 'react';
 import { FaPhoneAlt, FaWhatsapp } from 'react-icons/fa';
-import { useSiteSettings } from '../SiteSettingsContext';
+import { useSiteSettings } from '../context/SiteSettingsContext';
 
 function SupportButtons() {
   const { siteSettings } = useSiteSettings();

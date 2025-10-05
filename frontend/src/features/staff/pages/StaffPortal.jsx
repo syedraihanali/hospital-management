@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
-import { AuthContext } from '../AuthContext';
+import { AuthContext } from '../../auth/context/AuthContext';
 import { FaCalendarCheck, FaUserMd } from 'react-icons/fa';
 
 function StaffPortal() {

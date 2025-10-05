@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { FaFacebookF, FaInstagram, FaLinkedinIn, FaTwitter } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
-import { useSiteSettings } from '../../SiteSettingsContext';
+import { useSiteSettings } from '../../../shared/context/SiteSettingsContext';
 
 const sanitizeTel = (value) => value.replace(/[^+\d]/g, '');
 
