@@ -2,6 +2,13 @@ import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../auth/context/AuthContext';
 
+const normalizeSpecialization = (value) => {
+  if (!value || typeof value !== 'string' || !value.trim()) {
+    return 'General practice';
+  }
+  return value.trim();
+};
+
 function BookAppointmentPage() {
   const { auth, login } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -9,6 +16,8 @@ function BookAppointmentPage() {
   const apiBaseUrl = (process.env.REACT_APP_API_URL || '').replace(/\/$/, '');
 
   const [doctors, setDoctors] = useState([]);
+  const [doctorsLoading, setDoctorsLoading] = useState(true);
+  const [selectedSpecialization, setSelectedSpecialization] = useState('');
   const [selectedDoctorId, setSelectedDoctorId] = useState('');
   const [availableTimes, setAvailableTimes] = useState([]);
   const [uniqueDates, setUniqueDates] = useState([]);
@@ -43,6 +52,7 @@ function BookAppointmentPage() {
 
   useEffect(() => {
     const loadDoctors = async () => {
+      setDoctorsLoading(true);
       try {
         const response = await fetch(`${apiBaseUrl}/api/doctors`);
         if (!response.ok) {
@@ -50,17 +60,42 @@ function BookAppointmentPage() {
         }
         const data = await response.json();
         setDoctors(data);
-        if (data.length > 0) {
-          const defaultDoctorId = String(prefillState?.doctorId || data[0].DoctorID);
-          setSelectedDoctorId(defaultDoctorId);
-        }
       } catch (error) {
         setMessage({ type: 'error', text: error.message || 'Failed to load doctors.' });
+      } finally {
+        setDoctorsLoading(false);
       }
     };
 
     loadDoctors();
   }, [apiBaseUrl, prefillState]);
+
+  const specializationOptions = useMemo(() => {
+    if (!doctors.length) {
+      return [];
+    }
+
+    const grouped = doctors.reduce((acc, doctor) => {
+      const key = normalizeSpecialization(doctor.Specialization);
+      if (!acc.has(key)) {
+        acc.set(key, []);
+      }
+      acc.get(key).push(doctor);
+      return acc;
+    }, new Map());
+
+    return Array.from(grouped.entries())
+      .map(([label, docs]) => ({
+        label,
+        doctors: docs.slice().sort((a, b) => a.FullName.localeCompare(b.FullName)),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [doctors]);
+
+  const doctorsForSpecialization = useMemo(() => {
+    const group = specializationOptions.find((item) => item.label === selectedSpecialization);
+    return group ? group.doctors : [];
+  }, [selectedSpecialization, specializationOptions]);
 
   useEffect(() => {
     if (!selectedDoctorId) {
@@ -107,10 +142,62 @@ function BookAppointmentPage() {
   }, [prefillState]);
 
   useEffect(() => {
-    if (prefillState?.doctorId && doctors.length) {
-      setSelectedDoctorId(String(prefillState.doctorId));
+    if (!doctors.length) {
+      setSelectedSpecialization('');
+      setSelectedDoctorId('');
+      return;
     }
-  }, [doctors, prefillState]);
+
+    const targetDoctorId = prefillState?.doctorId ? String(prefillState.doctorId) : '';
+    if (targetDoctorId) {
+      const matchingDoctor = doctors.find((doctor) => String(doctor.DoctorID) === targetDoctorId);
+      if (matchingDoctor) {
+        const normalized = normalizeSpecialization(matchingDoctor.Specialization);
+        if (
+          selectedSpecialization !== normalized ||
+          selectedDoctorId !== String(matchingDoctor.DoctorID)
+        ) {
+          setSelectedSpecialization(normalized);
+          setSelectedDoctorId(String(matchingDoctor.DoctorID));
+        }
+        return;
+      }
+    }
+
+    if (!selectedSpecialization) {
+      const firstOption = specializationOptions[0];
+      const firstDoctor = firstOption?.doctors?.[0];
+      setSelectedSpecialization(firstOption?.label || '');
+      setSelectedDoctorId(firstDoctor ? String(firstDoctor.DoctorID) : '');
+    }
+  }, [
+    doctors,
+    prefillState,
+    selectedSpecialization,
+    selectedDoctorId,
+    specializationOptions,
+  ]);
+
+  useEffect(() => {
+    if (!selectedSpecialization) {
+      setSelectedDoctorId('');
+      return;
+    }
+
+    if (!doctorsForSpecialization.length) {
+      setSelectedDoctorId('');
+      return;
+    }
+
+    const exists = doctorsForSpecialization.some(
+      (doctor) => String(doctor.DoctorID) === selectedDoctorId
+    );
+
+    if (!exists) {
+      const fallback = doctorsForSpecialization[0];
+      setSelectedDoctorId(fallback ? String(fallback.DoctorID) : '');
+    }
+  }, [doctorsForSpecialization, selectedDoctorId, selectedSpecialization]);
 
   useEffect(() => {
     if (!prefillState?.date) {
@@ -191,6 +278,10 @@ function BookAppointmentPage() {
 
   const handleDoctorChange = (event) => {
     setSelectedDoctorId(event.target.value);
+  };
+
+  const handleSpecializationChange = (event) => {
+    setSelectedSpecialization(event.target.value);
   };
 
   const handleDateChange = (event) => {
@@ -328,24 +419,54 @@ function BookAppointmentPage() {
         >
           <section className="rounded-3xl border border-slate-200 bg-white/95 p-8 shadow-card backdrop-blur">
             <div className="space-y-6">
-              <div>
-                <label className="flex flex-col text-sm font-semibold text-slate-700">
-                  Specialist or doctor
-                  <select
-                    value={selectedDoctorId}
-                    onChange={handleDoctorChange}
-                    className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  >
-                    {doctors.map((doctor) => (
-                      <option key={doctor.DoctorID} value={doctor.DoctorID}>
-                        {doctor.FullName}
-                        {doctor.Specialization ? ` — ${doctor.Specialization}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              <div className="space-y-4">
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <label className="flex flex-col text-sm font-semibold text-slate-700">
+                    Specialist
+                    <select
+                      value={selectedSpecialization}
+                      onChange={handleSpecializationChange}
+                      disabled={doctorsLoading || !specializationOptions.length}
+                      className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent disabled:cursor-not-allowed"
+                    >
+                      {doctorsLoading ? (
+                        <option value="">Loading specialists…</option>
+                      ) : !specializationOptions.length ? (
+                        <option value="">No specialists available</option>
+                      ) : (
+                        specializationOptions.map((option) => (
+                          <option key={option.label} value={option.label}>
+                            {option.label}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </label>
+
+                  <label className="flex flex-col text-sm font-semibold text-slate-700">
+                    Doctor
+                    <select
+                      value={selectedDoctorId}
+                      onChange={handleDoctorChange}
+                      disabled={doctorsLoading || !doctorsForSpecialization.length}
+                      className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent disabled:cursor-not-allowed"
+                    >
+                      {doctorsLoading ? (
+                        <option value="">Loading doctors…</option>
+                      ) : !doctorsForSpecialization.length ? (
+                        <option value="">No doctors available</option>
+                      ) : (
+                        doctorsForSpecialization.map((doctor) => (
+                          <option key={doctor.DoctorID} value={doctor.DoctorID}>
+                            {doctor.FullName}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </label>
+                </div>
                 {selectedDoctor ? (
-                  <p className="mt-2 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">
+                  <p className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">
                     {selectedDoctor.Specialization
                       ? `${selectedDoctor.FullName} specialises in ${selectedDoctor.Specialization.toLowerCase()}.`
                       : `${selectedDoctor.FullName} is accepting general consultations.`}

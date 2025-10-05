@@ -1,4 +1,9 @@
-const { getAboutContent, getServicePackages, getSiteSettings } = require('../services/contentService');
+const {
+  getAboutContent,
+  getServicePackages,
+  getSiteSettings,
+  getHomeHeroContent,
+} = require('../services/contentService');
 
 async function fetchAboutContent(_req, res) {
   const content = await getAboutContent();
@@ -15,8 +20,14 @@ async function fetchSiteSettings(_req, res) {
   res.json(settings);
 }
 
+async function fetchHomeHeroContent(_req, res) {
+  const hero = await getHomeHeroContent();
+  res.json(hero);
+}
+
 module.exports = {
   fetchAboutContent,
   fetchServicePackages,
   fetchSiteSettings,
+  fetchHomeHeroContent,
 };

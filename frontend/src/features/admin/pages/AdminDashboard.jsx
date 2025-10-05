@@ -6,13 +6,17 @@ import DoctorApplicationsTab from '../components/DoctorApplicationsTab';
 import AboutContentTab from '../components/AboutContentTab';
 import ServicePackagesTab from '../components/ServicePackagesTab';
 import SiteSettingsTab from '../components/SiteSettingsTab';
+import HomeHeroTab from '../components/HomeHeroTab';
+import DoctorDirectoryTab from '../components/DoctorDirectoryTab';
 
 const tabs = [
   { id: 'overview', label: 'Overview' },
   { id: 'doctor-applications', label: 'Doctor Applications' },
   { id: 'about', label: 'About Page' },
   { id: 'packages', label: 'Service Packages' },
+  { id: 'home-hero', label: 'Homepage Hero' },
   { id: 'site-settings', label: 'Site Settings' },
+  { id: 'doctor-directory', label: 'Doctor Directory' },
 ];
 
 function AdminDashboard() {
@@ -59,6 +63,7 @@ function AdminDashboard() {
       {activeTab === 'doctor-applications' ? <DoctorApplicationsTab token={auth.token} /> : null}
       {activeTab === 'about' ? <AboutContentTab token={auth.token} /> : null}
       {activeTab === 'packages' ? <ServicePackagesTab token={auth.token} /> : null}
+      {activeTab === 'home-hero' ? <HomeHeroTab token={auth.token} /> : null}
       {activeTab === 'site-settings' ? (
         <SiteSettingsTab
           token={auth.token}
@@ -67,6 +72,7 @@ function AdminDashboard() {
           setCachedSiteSettings={setCachedSiteSettings}
         />
       ) : null}
+      {activeTab === 'doctor-directory' ? <DoctorDirectoryTab token={auth.token} /> : null}
     </div>
   );
 }

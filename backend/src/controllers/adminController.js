@@ -1,4 +1,9 @@
-const { getOverviewMetrics } = require('../services/adminService');
+const {
+  getOverviewMetrics,
+  searchDoctorsDirectory,
+  getDoctorProfileForAdmin,
+  listDoctorAppointmentsForAdmin,
+} = require('../services/adminService');
 const {
   listDoctorApplications,
   reviewDoctorApplication,
@@ -38,8 +43,42 @@ async function reviewDoctorApplicationHandler(req, res) {
   return res.json({ message: 'Application reviewed successfully.', doctorId });
 }
 
+async function searchDoctorsDirectoryHandler(req, res) {
+  const { search = '' } = req.query;
+  const doctors = await searchDoctorsDirectory(search);
+  return res.json(doctors);
+}
+
+async function getDoctorDirectoryProfile(req, res) {
+  const doctorId = Number.parseInt(req.params.id, 10);
+  if (Number.isNaN(doctorId)) {
+    return res.status(400).json({ message: 'Invalid doctor identifier.' });
+  }
+
+  const doctor = await getDoctorProfileForAdmin(doctorId);
+  if (!doctor) {
+    return res.status(404).json({ message: 'Doctor not found.' });
+  }
+
+  return res.json(doctor);
+}
+
+async function getDoctorAppointmentsForAdminHandler(req, res) {
+  const doctorId = Number.parseInt(req.params.id, 10);
+  if (Number.isNaN(doctorId)) {
+    return res.status(400).json({ message: 'Invalid doctor identifier.' });
+  }
+
+  const scope = ['upcoming', 'history', 'all'].includes(req.query.scope) ? req.query.scope : 'all';
+  const appointments = await listDoctorAppointmentsForAdmin(doctorId, scope);
+  return res.json(appointments);
+}
+
 module.exports = {
   getOverview,
   getDoctorApplications,
   reviewDoctorApplicationHandler,
+  searchDoctorsDirectoryHandler,
+  getDoctorDirectoryProfile,
+  getDoctorAppointmentsForAdminHandler,
 };

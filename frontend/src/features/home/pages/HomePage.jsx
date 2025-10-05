@@ -3,6 +3,15 @@ import { Link } from 'react-router-dom';
 import HomeFooter from '../components/HomeFooter';
 import { useSiteSettings } from '../../../shared/context/SiteSettingsContext';
 
+const defaultHeroContent = {
+  eyebrow: 'Coordinated care, on your schedule',
+  title: 'Expert specialists and secure records in one hospital hub',
+  subtitle:
+    'Plan visits, share medical documents, and stay aligned with your care team from the comfort of your home.',
+  imageUrl: 'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?auto=format&fit=crop&w=1600&q=80',
+  ctaLabel: 'Book an appointment',
+};
+
 const testimonials = [
   {
     quote:
@@ -27,42 +36,21 @@ const testimonials = [
   },
 ];
 
-const formatReadableDate = (value) => {
-  try {
-    return new Date(value).toLocaleDateString(undefined, {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    });
-  } catch (error) {
-    return value;
-  }
-};
-
-const formatTimeLabel = (timeString) => {
-  if (!timeString) {
-    return '';
-  }
-
-  const [hours, minutes] = timeString.split(':');
-  const date = new Date();
-  date.setHours(Number.parseInt(hours, 10), Number.parseInt(minutes, 10), 0, 0);
-
-  return date.toLocaleTimeString([], {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-};
-
-const formatTimeRange = (start, end) => {
-  if (!start || !end) {
-    return '';
-  }
-
-  return `${formatTimeLabel(start)} - ${formatTimeLabel(end)}`;
-};
-
 const sanitizeTel = (value = '') => value.replace(/[^+\d]/g, '');
+
+function mergeHeroContent(value) {
+  if (!value || typeof value !== 'object') {
+    return { ...defaultHeroContent };
+  }
+
+  const merged = { ...defaultHeroContent };
+  ['eyebrow', 'title', 'subtitle', 'imageUrl', 'ctaLabel'].forEach((key) => {
+    if (typeof value[key] === 'string' && value[key].trim()) {
+      merged[key] = value[key];
+    }
+  });
+  return merged;
+}
 
 function HomePage() {
   const apiBaseUrl = useMemo(() => {
@@ -70,16 +58,9 @@ function HomePage() {
     return url.endsWith('/') ? url.slice(0, -1) : url;
   }, []);
   const { siteSettings } = useSiteSettings();
-  const [doctors, setDoctors] = useState([]);
-  const [doctorsLoading, setDoctorsLoading] = useState(true);
-  const [doctorsError, setDoctorsError] = useState('');
-  const [selectedDoctorId, setSelectedDoctorId] = useState(null);
-  const [availability, setAvailability] = useState([]);
-  const [availabilityLoading, setAvailabilityLoading] = useState(false);
-  const [availabilityError, setAvailabilityError] = useState('');
-  const [selectedDate, setSelectedDate] = useState('');
-  const [selectedSlotId, setSelectedSlotId] = useState('');
-  const [confirmation, setConfirmation] = useState('');
+  const [heroContent, setHeroContent] = useState(defaultHeroContent);
+  const [heroStatus, setHeroStatus] = useState('idle');
+  const [heroError, setHeroError] = useState('');
 
   const siteName = siteSettings?.siteName ?? 'Destination Health';
   const emergencyContactName = siteSettings?.emergencyContactName ?? 'Emergency coordination desk';
@@ -90,297 +71,86 @@ function HomePage() {
   useEffect(() => {
     let isMounted = true;
 
-    const fetchDoctors = async () => {
-      setDoctorsLoading(true);
-      setDoctorsError('');
+    const loadHero = async () => {
+      setHeroStatus('loading');
+      setHeroError('');
       try {
-        const response = await fetch(`${apiBaseUrl}/api/doctors`);
+        const response = await fetch(`${apiBaseUrl}/api/content/home-hero`);
         if (!response.ok) {
-          throw new Error('Failed to load doctors.');
+          throw new Error('Unable to load homepage highlight.');
         }
 
         const data = await response.json();
         if (isMounted) {
-          setDoctors(data);
-          setSelectedDoctorId(data[0]?.DoctorID ?? null);
+          setHeroContent(mergeHeroContent(data));
+          setHeroStatus('succeeded');
         }
       } catch (error) {
         if (isMounted) {
-          setDoctorsError(error.message || 'Unable to retrieve doctors at the moment.');
-          setDoctors([]);
-          setSelectedDoctorId(null);
-        }
-      } finally {
-        if (isMounted) {
-          setDoctorsLoading(false);
+          setHeroContent(defaultHeroContent);
+          setHeroStatus('failed');
+          setHeroError(error.message || 'Unable to load homepage highlight.');
         }
       }
     };
 
-    fetchDoctors();
+    loadHero();
 
     return () => {
       isMounted = false;
     };
   }, [apiBaseUrl]);
 
-  useEffect(() => {
-    if (!selectedDoctorId) {
-      setAvailability([]);
-      setSelectedDate('');
-      setSelectedSlotId('');
-      return;
-    }
-
-    let isMounted = true;
-
-    const fetchAvailability = async () => {
-      setAvailabilityLoading(true);
-      setAvailabilityError('');
-      try {
-        const response = await fetch(
-          `${apiBaseUrl}/api/doctors/${selectedDoctorId}/available-times?limit=25`
-        );
-        if (!response.ok) {
-          throw new Error('Failed to load availability.');
-        }
-
-        const data = await response.json();
-        if (isMounted) {
-          setAvailability(Array.isArray(data) ? data : []);
-        }
-      } catch (error) {
-        if (isMounted) {
-          setAvailability([]);
-          setAvailabilityError(error.message || 'Unable to load available times.');
-        }
-      } finally {
-        if (isMounted) {
-          setAvailabilityLoading(false);
-        }
+  const heroBackgroundStyle = heroContent.imageUrl
+    ? {
+        backgroundImage: `linear-gradient(135deg, rgba(7, 116, 105, 0.82), rgba(15, 23, 42, 0.78)), url(${heroContent.imageUrl})`,
       }
-    };
-
-    fetchAvailability();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [apiBaseUrl, selectedDoctorId]);
-
-  useEffect(() => {
-    if (!selectedDate && availability.length > 0) {
-      setSelectedDate(availability[0].ScheduleDate);
-    }
-  }, [availability, selectedDate]);
-
-  useEffect(() => {
-    const slotsForCurrentDate = availability.filter((slot) => slot.ScheduleDate === selectedDate);
-
-    if (slotsForCurrentDate.length === 0) {
-      setSelectedSlotId('');
-      return;
-    }
-
-    if (!slotsForCurrentDate.some((slot) => String(slot.AvailableTimeID) === selectedSlotId)) {
-      setSelectedSlotId(String(slotsForCurrentDate[0].AvailableTimeID));
-    }
-  }, [availability, selectedDate, selectedSlotId]);
-
-  const availableDates = useMemo(
-    () => [...new Set(availability.map((slot) => slot.ScheduleDate))],
-    [availability]
-  );
-
-  const slotsForSelectedDate = useMemo(
-    () => availability.filter((slot) => slot.ScheduleDate === selectedDate),
-    [availability, selectedDate]
-  );
-
-  const activeDoctorDetails = useMemo(
-    () => doctors.find((doctor) => doctor.DoctorID === selectedDoctorId) || null,
-    [doctors, selectedDoctorId]
-  );
-
-  const nextAvailability = useMemo(() => {
-    if (availability.length > 0) {
-      return availability[0];
-    }
-
-    if (activeDoctorDetails?.NextScheduleDate) {
-      return {
-        ScheduleDate: activeDoctorDetails.NextScheduleDate,
-        StartTime: activeDoctorDetails.NextStartTime,
-        EndTime: activeDoctorDetails.NextEndTime,
-      };
-    }
-
-    return null;
-  }, [availability, activeDoctorDetails]);
-
-  const handleDoctorChange = (event) => {
-    const value = Number.parseInt(event.target.value, 10);
-    setSelectedDoctorId(Number.isNaN(value) ? null : value);
-  };
-
-  const handleDateChange = (event) => {
-    setSelectedDate(event.target.value);
-  };
-
-  const handleTimeChange = (event) => {
-    setSelectedSlotId(event.target.value);
-  };
-
-  const handleSubmit = (event) => {
-    event.preventDefault();
-    const slot = availability.find((item) => String(item.AvailableTimeID) === selectedSlotId);
-    const doctorName = activeDoctorDetails?.FullName || 'the selected doctor';
-
-    if (!slot) {
-      setConfirmation('Please choose an available appointment time to continue.');
-      return;
-    }
-
-    setConfirmation(
-      `Appointment request saved for ${doctorName} on ${formatReadableDate(
-        slot.ScheduleDate,
-      )} at ${formatTimeRange(slot.StartTime, slot.EndTime)}. Sign in as a patient to confirm.`
-    );
-    setTimeout(() => setConfirmation(''), 6000);
-  };
+    : {};
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-20 sm:px-6 lg:px-8">
-      <section className="relative mt-6 rounded-[40px] border border-white/60 bg-white/70 p-8 shadow-glass backdrop-blur-2xl sm:p-12">
-        <div className="pointer-events-none absolute inset-0 rounded-[40px] bg-gradient-to-br from-brand-primary/15 via-transparent to-brand-secondary mix-blend-screen" />
-        <div className="relative z-10 mx-auto max-w-3xl">
-          <h1 className="text-center text-3xl font-semibold text-brand-dark sm:text-4xl">Book an appointment</h1>
-          <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-            <div className="grid gap-5 sm:grid-cols-2">
-              <label className="flex flex-col gap-2 text-sm font-medium text-slate-600">
-                Doctor
-                <select
-                  value={selectedDoctorId ?? ''}
-                  onChange={handleDoctorChange}
-                  disabled={doctorsLoading || doctors.length === 0}
-                  className="w-full rounded-2xl border border-emerald-100 bg-white/80 px-4 py-3 text-base text-brand-dark shadow-soft focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/40 disabled:cursor-not-allowed disabled:bg-slate-100"
-                >
-                  {doctorsLoading ? (
-                    <option value="">Loading doctors...</option>
-                  ) : doctors.length === 0 ? (
-                    <option value="">No doctors available</option>
-                  ) : (
-                    doctors.map((doctor) => (
-                      <option key={doctor.DoctorID} value={doctor.DoctorID}>
-                        {doctor.FullName}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm font-medium text-slate-600">
-                Date
-                <select
-                  value={selectedDate}
-                  onChange={handleDateChange}
-                  disabled={availabilityLoading || availableDates.length === 0}
-                  className="w-full rounded-2xl border border-emerald-100 bg-white/80 px-4 py-3 text-base text-brand-dark shadow-soft focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/40 disabled:cursor-not-allowed disabled:bg-slate-100"
-                >
-                  {availabilityLoading ? (
-                    <option value="">Loading dates...</option>
-                  ) : availableDates.length === 0 ? (
-                    <option value="">No upcoming availability</option>
-                  ) : (
-                    availableDates.map((date) => (
-                      <option key={date} value={date}>
-                        {formatReadableDate(date)}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm font-medium text-slate-600">
-                Time
-                <select
-                  value={selectedSlotId}
-                  onChange={handleTimeChange}
-                  disabled={slotsForSelectedDate.length === 0}
-                  className="w-full rounded-2xl border border-emerald-100 bg-white/80 px-4 py-3 text-base text-brand-dark shadow-soft focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/40 disabled:cursor-not-allowed disabled:bg-slate-100"
-                >
-                  {slotsForSelectedDate.length === 0 ? (
-                    <option value="">No time slots available</option>
-                  ) : (
-                    slotsForSelectedDate.map((slot) => (
-                      <option key={slot.AvailableTimeID} value={slot.AvailableTimeID}>
-                        {formatTimeRange(slot.StartTime, slot.EndTime)}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </label>
-
-              {doctorsError && (
-                <div className="sm:col-span-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
-                  {doctorsError}
-                </div>
-              )}
-
-              {availabilityError && !availabilityLoading && (
-                <div className="sm:col-span-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700">
-                  {availabilityError}
-                </div>
-              )}
+      <section
+        className="relative mt-6 overflow-hidden rounded-[40px] border border-white/30 bg-slate-900 text-white shadow-glass"
+        style={heroBackgroundStyle}
+      >
+        <div className="absolute inset-0 bg-cover bg-center" aria-hidden="true" style={heroBackgroundStyle} />
+        <div className="relative z-10 flex flex-col gap-8 p-10 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl space-y-5">
+            <span className="inline-flex items-center rounded-full bg-white/15 px-4 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-white/80">
+              {heroContent.eyebrow}
+            </span>
+            <h1 className="text-4xl font-semibold leading-tight text-white sm:text-5xl">
+              {heroContent.title}
+            </h1>
+            <p className="text-base text-white/85 sm:text-lg">{heroContent.subtitle}</p>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                to="/book-appointment"
+                className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-base font-semibold text-brand-primary shadow-soft transition hover:bg-brand-secondary/90 hover:text-brand-dark"
+              >
+                {heroContent.ctaLabel}
+              </Link>
+              <Link
+                to="/services"
+                className="inline-flex items-center justify-center rounded-full border border-white/70 px-6 py-3 text-base font-semibold text-white transition hover:bg-white/10"
+              >
+                Explore services
+              </Link>
             </div>
-
-            {activeDoctorDetails && (
-              <div className="grid gap-4 rounded-3xl border border-brand-primary/20 bg-brand-secondary/60 p-6 text-sm text-brand-dark shadow-soft sm:grid-cols-2">
-                <div>
-                  <p className="font-semibold text-brand-dark">{activeDoctorDetails.FullName}</p>
-                  <p className="mt-1 text-slate-600">
-                    {activeDoctorDetails.AvailableSlotCount > 0
-                      ? `${activeDoctorDetails.AvailableSlotCount} available time slot${
-                          activeDoctorDetails.AvailableSlotCount === 1 ? '' : 's'
-                        }`
-                      : 'No upcoming availability listed'}
-                  </p>
-                </div>
-                <div className="flex items-center justify-start sm:justify-end">
-                  {nextAvailability ? (
-                    <span className="rounded-full bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-brand-dark">
-                      Next availability · {formatReadableDate(nextAvailability.ScheduleDate)} ·{' '}
-                      {formatTimeLabel(nextAvailability.StartTime)}
-                    </span>
-                  ) : (
-                    <span className="rounded-full bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Availability information not yet published
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={
-                doctorsLoading ||
-                availabilityLoading ||
-                !selectedDoctorId ||
-                slotsForSelectedDate.length === 0 ||
-                !selectedSlotId
-              }
-              className="w-full rounded-full bg-brand-primary px-6 py-3 text-base font-semibold text-white shadow-soft transition hover:bg-brand-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              {doctorsLoading || availabilityLoading ? 'Loading...' : 'Reserve appointment'}
-            </button>
-
-            {confirmation && (
-              <p className="rounded-2xl border border-brand-primary/30 bg-white/70 px-4 py-3 text-center text-sm text-brand-dark shadow-soft">
-                {confirmation}
+            {heroStatus === 'failed' ? (
+              <p className="rounded-2xl border border-amber-300 bg-amber-100/40 px-4 py-2 text-sm font-medium text-amber-100">
+                {heroError}
               </p>
-            )}
-          </form>
+            ) : null}
+          </div>
+          <div className="rounded-3xl border border-white/30 bg-white/15 p-6 text-sm text-white/80 shadow-inner backdrop-blur">
+            <p className="text-xs font-semibold uppercase tracking-wide text-white/70">Why patients choose {siteName}</p>
+            <ul className="mt-3 space-y-2">
+              <li>• Specialists across 20+ departments in one network</li>
+              <li>• Secure document vault for every appointment</li>
+              <li>• Real-time coordination between doctors and patients</li>
+            </ul>
+          </div>
         </div>
       </section>
 
