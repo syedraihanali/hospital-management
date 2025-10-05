@@ -67,7 +67,7 @@ function App() {
                 }
               />
               <Route
-                path="/staff-portal"
+                path="/staff-portal/*"
                 element={
                   auth.token && auth.user?.role === 'doctor' ? (
                     <StaffPortal />
