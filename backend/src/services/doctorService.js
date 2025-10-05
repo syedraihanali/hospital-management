@@ -167,11 +167,14 @@ async function reviewDoctorApplication({ applicationId, status, reviewerUserId, 
     throw new Error('Invalid review status provided.');
   }
 
+  const reviewerId = reviewerUserId ?? null;
+  const reviewNotes = typeof notes === 'string' ? notes : notes ?? null;
+
   await execute(
     `UPDATE doctor_applications
      SET Status = ?, ReviewedAt = CURRENT_TIMESTAMP, ReviewerID = ?, ReviewNotes = ?
      WHERE ApplicationID = ?`,
-    [status, reviewerUserId, notes, applicationId]
+    [status, reviewerId, reviewNotes, applicationId]
   );
 }
 
@@ -223,13 +226,52 @@ async function createDoctorFromApplication(applicationId, defaultPassword = 'Doc
 }
 
 async function updateDoctorProfile(doctorId, { fullName, email, phoneNumber, specialization, avatarUrl }) {
+  const sanitizedFullName = sanitize(fullName);
+  const sanitizedEmail = sanitize(email).toLowerCase();
+  const sanitizedPhoneNumber = sanitize(phoneNumber);
+  const sanitizedSpecialization =
+    specialization === undefined || specialization === null ? null : String(specialization).trim();
+
+  if (!sanitizedFullName || !sanitizedEmail || !sanitizedPhoneNumber) {
+    const error = new Error('Full name, email, and phone number are required.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const duplicateUserEmail = await execute(
+    `SELECT UserID
+       FROM users
+      WHERE LOWER(Email) = ? AND (DoctorID IS NULL OR DoctorID <> ?)`,
+    [sanitizedEmail, doctorId]
+  );
+
+  if (duplicateUserEmail.length) {
+    const error = new Error('Another account already uses this email.');
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const duplicateDoctorEmail = await execute(
+    `SELECT DoctorID
+       FROM doctors
+      WHERE LOWER(Email) = ? AND DoctorID <> ?`,
+    [sanitizedEmail, doctorId]
+  );
+
+  if (duplicateDoctorEmail.length) {
+    const error = new Error('Another doctor profile already uses this email.');
+    error.statusCode = 409;
+    throw error;
+  }
+
   await execute(
     `UPDATE doctors
      SET FullName = ?, Email = ?, PhoneNumber = ?, Specialization = ?, AvatarUrl = ?
      WHERE DoctorID = ?`,
-    [fullName, email, phoneNumber, specialization, avatarUrl, doctorId]
+    [sanitizedFullName, sanitizedEmail, sanitizedPhoneNumber, sanitizedSpecialization, avatarUrl, doctorId]
   );
-  await execute('UPDATE users SET Email = ? WHERE DoctorID = ?', [email, doctorId]);
+
+  await execute('UPDATE users SET Email = ? WHERE DoctorID = ?', [sanitizedEmail, doctorId]);
 }
 
 async function updateDoctorPassword(doctorId, password) {
