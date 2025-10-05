@@ -71,29 +71,54 @@ async function getDoctorIdForPatient(patientId) {
   return patients[0]?.DoctorID;
 }
 
-async function listPatientDocuments(patientId, { search = '', sort = 'desc' } = {}) {
+async function listPatientDocuments(patientId, { search = '', sort = 'desc', appointmentId = null } = {}) {
   const order = sort === 'asc' ? 'ASC' : 'DESC';
   const like = `%${search}%`;
+  const params = [patientId, like];
+  let appointmentClause = '';
+
+  if (appointmentId) {
+    appointmentClause = ' AND AppointmentID = ?';
+    params.push(appointmentId);
+  }
+
   return execute(
     `SELECT DocumentID, DocumentName, FileUrl, UploadedAt, AppointmentID
      FROM patient_documents
-     WHERE PatientID = ? AND DocumentName LIKE ?
+     WHERE PatientID = ? AND DocumentName LIKE ?${appointmentClause}
      ORDER BY UploadedAt ${order}`,
-    [patientId, like]
+    params
   );
 }
 
-async function listPatientReports(patientId, { search = '', sort = 'desc' } = {}) {
+async function listPatientReports(patientId, { search = '', sort = 'desc', appointmentId = null } = {}) {
   const order = sort === 'asc' ? 'ASC' : 'DESC';
   const like = `%${search}%`;
+  const params = [patientId, like, like];
+  let appointmentClause = '';
+
+  if (appointmentId) {
+    appointmentClause = ' AND r.AppointmentID = ?';
+    params.push(appointmentId);
+  }
+
   return execute(
-    `SELECT r.ReportID, r.Title, r.Description, r.FileUrl, r.CreatedAt, d.FullName AS DoctorName
+    `SELECT r.ReportID, r.AppointmentID, r.Title, r.Description, r.FileUrl, r.CreatedAt, d.FullName AS DoctorName
      FROM doctor_reports r
      JOIN doctors d ON r.DoctorID = d.DoctorID
-     WHERE r.PatientID = ? AND (r.Title LIKE ? OR r.Description LIKE ?)
+     WHERE r.PatientID = ? AND (r.Title LIKE ? OR r.Description LIKE ?)${appointmentClause}
      ORDER BY r.CreatedAt ${order}`,
-    [patientId, like, like]
+    params
   );
+}
+
+async function findPatientByNid(nidNumber) {
+  const patients = await execute(
+    `SELECT PatientID, FullName, BirthDate, PhoneNumber, Email, Gender, Address, DoctorID, NidNumber, AvatarUrl
+     FROM patients WHERE NidNumber = ?`,
+    [nidNumber]
+  );
+  return patients[0];
 }
 
 async function savePatientDocument(patientId, name, url, appointmentId = null) {
@@ -130,4 +155,5 @@ module.exports = {
   savePatientDocument,
   updatePatientProfile,
   updatePatientPassword,
+  findPatientByNid,
 };

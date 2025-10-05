@@ -9,6 +9,7 @@ const appointmentRoutes = require('./routes/appointmentRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const contentRoutes = require('./routes/contentRoutes');
 const errorHandler = require('./middleware/errorHandler');
+const publicPatientRoutes = require('./routes/publicPatientRoutes');
 
 // Create and configure the Express application instance.
 const app = express();
@@ -30,6 +31,7 @@ app.use('/api/patients', patientRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/content', contentRoutes);
+app.use('/api/patient-access', publicPatientRoutes);
 
 // Fallback handler for unmatched routes to avoid Express default HTML responses.
 app.use((req, res) => {

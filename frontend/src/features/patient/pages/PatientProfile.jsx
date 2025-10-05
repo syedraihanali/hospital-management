@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AuthContext } from '../../auth/context/AuthContext';
-import { FaCalendarCheck, FaDownload, FaFileMedical, FaPrescriptionBottle } from 'react-icons/fa';
+import { FaCalendarCheck } from 'react-icons/fa';
 
 function PatientProfile() {
   const { auth } = useContext(AuthContext);
@@ -8,7 +9,7 @@ function PatientProfile() {
   const patientId = auth.user?.id;
 
   const [profile, setProfile] = useState(null);
-  const [timeline, setTimeline] = useState({ appointments: [], documents: [], reports: [] });
+  const [appointmentHistory, setAppointmentHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [profileForm, setProfileForm] = useState(null);
@@ -51,11 +52,9 @@ function PatientProfile() {
       const profileData = await profileRes.json();
       const timelineData = await timelineRes.json();
       setProfile(profileData);
-      setTimeline({
-        appointments: Array.isArray(timelineData.appointments) ? timelineData.appointments : [],
-        documents: Array.isArray(timelineData.documents) ? timelineData.documents : [],
-        reports: Array.isArray(timelineData.reports) ? timelineData.reports : [],
-      });
+      setAppointmentHistory(
+        Array.isArray(timelineData.appointments) ? timelineData.appointments : []
+      );
       setProfileForm({
         fullName: profileData.FullName || '',
         phoneNumber: profileData.PhoneNumber || '',
@@ -83,11 +82,7 @@ function PatientProfile() {
         throw new Error('Unable to refresh history.');
       }
       const data = await response.json();
-      setTimeline({
-        appointments: Array.isArray(data.appointments) ? data.appointments : [],
-        documents: Array.isArray(data.documents) ? data.documents : [],
-        reports: Array.isArray(data.reports) ? data.reports : [],
-      });
+      setAppointmentHistory(Array.isArray(data.appointments) ? data.appointments : []);
     } catch (err) {
       setError(err.message || 'Failed to refresh history.');
     }
@@ -98,60 +93,48 @@ function PatientProfile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patientId]);
 
-  const combinedEntries = useMemo(() => {
-    const entries = [];
-
-    timeline.appointments.forEach((appointment) => {
-      const appointmentDate = new Date(`${appointment.ScheduleDate}T${appointment.StartTime || '00:00'}`);
-      entries.push({
-        id: `appointment-${appointment.AppointmentID}`,
-        type: 'appointment',
-        title: `Appointment with ${appointment.DoctorName}`,
-        subtitle: `Status: ${appointment.Status?.toUpperCase()}`,
-        description: appointment.Notes || '',
-        date: appointmentDate,
-      });
-    });
-
-    timeline.documents.forEach((document) => {
-      const uploadedAt = document.UploadedAt ? new Date(document.UploadedAt) : new Date();
-      entries.push({
-        id: `document-${document.DocumentID}`,
-        type: 'document',
-        title: document.DocumentName,
-        subtitle: 'Uploaded medical record',
-        url: document.FileUrl,
-        date: uploadedAt,
-      });
-    });
-
-    timeline.reports.forEach((report) => {
-      const createdAt = report.CreatedAt ? new Date(report.CreatedAt) : new Date();
-      entries.push({
-        id: `report-${report.ReportID}`,
-        type: 'report',
-        title: report.Title,
-        subtitle: report.DoctorName ? `Doctor: ${report.DoctorName}` : 'Doctor report',
-        description: report.Description || '',
-        url: report.FileUrl,
-        date: createdAt,
-      });
-    });
-
+  const appointmentEntries = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
+    const entries = (appointmentHistory || []).map((appointment) => {
+      const startTime = appointment.StartTime || '00:00';
+      const entryDate = new Date(`${appointment.ScheduleDate}T${startTime}`);
+      const displayDate = entryDate.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      const timeRange = appointment.EndTime
+        ? `${appointment.StartTime || '—'} – ${appointment.EndTime}`
+        : appointment.StartTime || '';
+
+      return {
+        id: `appointment-${appointment.AppointmentID}`,
+        appointmentId: appointment.AppointmentID,
+        doctorName: appointment.DoctorName,
+        status: appointment.Status || 'pending',
+        notes: appointment.Notes || '',
+        dateValue: entryDate,
+        displayDate,
+        timeRange,
+      };
+    });
 
     const filtered = normalizedSearch
       ? entries.filter((entry) =>
-          [entry.title, entry.subtitle, entry.description]
+          [entry.doctorName, entry.status, entry.notes, entry.displayDate]
             .filter(Boolean)
             .some((value) => value.toLowerCase().includes(normalizedSearch))
         )
       : entries;
 
     return filtered.sort((a, b) =>
-      sortOrder === 'asc' ? a.date.getTime() - b.date.getTime() : b.date.getTime() - a.date.getTime()
+      sortOrder === 'asc'
+        ? a.dateValue.getTime() - b.dateValue.getTime()
+        : b.dateValue.getTime() - a.dateValue.getTime()
     );
-  }, [timeline, searchTerm, sortOrder]);
+  }, [appointmentHistory, searchTerm, sortOrder]);
 
   const handleProfileInputChange = (event) => {
     const { name, value } = event.target;
@@ -460,6 +443,13 @@ function PatientProfile() {
               >
                 Upload document
               </button>
+              <p className="text-xs text-slate-500">
+                Uploaded files will appear on the{' '}
+                <Link to="/medical-history" className="font-semibold text-brand-primary underline">
+                  medical history page
+                </Link>
+                .
+              </p>
             </form>
           </div>
         </article>
@@ -468,13 +458,19 @@ function PatientProfile() {
       <section className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card backdrop-blur">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-brand-primary">Timeline & records</h2>
-            <p className="text-sm text-slate-600">Search across appointments, uploaded documents, and doctor reports.</p>
+            <h2 className="text-xl font-semibold text-brand-primary">Appointment history</h2>
+            <p className="text-sm text-slate-600">
+              Search across your confirmed and completed visits. For medical documents and prescriptions, head to the{' '}
+              <Link to="/medical-history" className="font-semibold text-brand-primary underline">
+                medical history page
+              </Link>
+              .
+            </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <input
               type="search"
-              placeholder="Search by doctor or title"
+              placeholder="Search by doctor, status, or note"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               className="rounded-full border border-slate-300 px-4 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
@@ -487,55 +483,42 @@ function PatientProfile() {
               <option value="desc">Newest first</option>
               <option value="asc">Oldest first</option>
             </select>
+            <Link
+              to="/medical-history"
+              className="inline-flex items-center justify-center rounded-full border border-brand-primary px-4 py-2 text-xs font-semibold text-brand-primary transition hover:bg-brand-primary hover:text-white"
+            >
+              View medical records
+            </Link>
           </div>
         </div>
 
         <div className="mt-6 grid gap-4">
-          {combinedEntries.length === 0 ? (
+          {appointmentEntries.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
-              No records found. Upload documents or book an appointment to get started.
+              No appointments in your history yet. Book a visit to see it appear here.
             </div>
           ) : (
-            combinedEntries.map((entry) => (
+            appointmentEntries.map((entry) => (
               <article
                 key={entry.id}
                 className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/90 px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="flex items-start gap-3">
                   <div className="mt-1 flex h-12 w-12 items-center justify-center rounded-full bg-brand-secondary text-brand-primary">
-                    {entry.type === 'appointment' ? (
-                      <FaCalendarCheck aria-hidden="true" />
-                    ) : entry.type === 'report' ? (
-                      <FaPrescriptionBottle aria-hidden="true" />
-                    ) : (
-                      <FaFileMedical aria-hidden="true" />
-                    )}
+                    <FaCalendarCheck aria-hidden="true" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-900">{entry.title}</h3>
-                    <p className="text-xs text-slate-600">{entry.subtitle}</p>
-                    {entry.description ? <p className="mt-1 text-xs text-slate-500">{entry.description}</p> : null}
-                    <p className="mt-1 text-xs text-slate-400">
-                      {entry.date.toLocaleString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                    <h3 className="text-sm font-semibold text-slate-900">Appointment with {entry.doctorName}</h3>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Status: {entry.status.toUpperCase()}
                     </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {entry.displayDate}
+                      {entry.timeRange ? ` · ${entry.timeRange}` : ''}
+                    </p>
+                    {entry.notes ? <p className="mt-2 text-xs text-slate-600">{entry.notes}</p> : null}
                   </div>
                 </div>
-                {entry.url ? (
-                  <a
-                    href={entry.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 self-start rounded-full border border-brand-primary px-4 py-2 text-xs font-semibold text-brand-primary transition hover:bg-brand-primary hover:text-white"
-                  >
-                    <FaDownload aria-hidden="true" /> Download
-                  </a>
-                ) : null}
               </article>
             ))
           )}

@@ -55,6 +55,7 @@ function Header() {
         return [
           { label: 'Home', to: '/' },
           { label: 'Book', to: '/book-appointment' },
+          { label: 'Get Reports', to: '/reports' },
           { label: 'Services', to: '/services' },
           { label: 'About Us', to: '/about-us' },
         ];
