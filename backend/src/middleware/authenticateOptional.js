@@ -1,7 +1,5 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config/env');
-
-// Attempts to authenticate the incoming request but allows anonymous access.
 function authenticateOptional(req, _res, next) {
   const authorizationHeader = req.headers.authorization;
 

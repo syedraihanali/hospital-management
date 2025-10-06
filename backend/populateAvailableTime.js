@@ -1,7 +1,5 @@
 const mysql = require('mysql2/promise');
 const config = require('./src/config/env');
-
-// Utility script to seed random availability slots for doctors.
 function formatDate(date) {
   const year = date.getFullYear();
   const month = (`0${date.getMonth() + 1}`).slice(-2);

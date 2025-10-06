@@ -2,7 +2,6 @@ const bcrypt = require('bcryptjs');
 const { execute } = require('./query');
 const { migrateMissingPatientUsers } = require('../services/userService');
 
-// Ensures the database schema exists before the application handles requests.
 async function ensureSchema() {
   await createDoctorsTable();
   await createPatientsTable();

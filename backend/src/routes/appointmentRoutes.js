@@ -9,7 +9,6 @@ const {
 
 const router = Router();
 
-// Appointment scheduling endpoints.
 router.get('/available-times', authenticateOptional, asyncHandler(getAvailableTimesHandler));
 router.post(
   '/book',

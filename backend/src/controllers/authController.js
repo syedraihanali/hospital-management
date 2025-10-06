@@ -2,8 +2,6 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const config = require('../config/env');
 const { findUserByEmail } = require('../services/userService');
-
-// Authenticates a user and issues a signed JWT using the stored role metadata.
 async function signIn(req, res) {
   const { email, password } = req.body;
 
@@ -54,8 +52,6 @@ async function signIn(req, res) {
     },
   });
 }
-
-// Stateless logout endpoint retained for API symmetry.
 function logout(_req, res) {
   return res.json({ message: 'Logout successful' });
 }

@@ -3,8 +3,6 @@ const config = require('../config/env');
 const { getAvailableTimes, bookAppointment } = require('../services/appointmentService');
 const { createPatient, savePatientDocument } = require('../services/patientService');
 const { storeFile } = require('../services/storageService');
-
-// Lists available appointment slots for the provided doctor identifier.
 async function getAvailableTimesHandler(req, res) {
   const doctorIdParam = req.query.doctorId;
   const doctorId = Number.parseInt(doctorIdParam, 10);
@@ -50,21 +48,16 @@ async function persistDocuments(patientId, appointmentId, files = []) {
   }
 
   const stored = [];
-  // eslint-disable-next-line no-restricted-syntax
   for (const file of files) {
-    // eslint-disable-next-line no-await-in-loop
     const url = await storeFile(file, 'patient-documents');
     if (url) {
       stored.push({ name: file.originalname, url });
-      // eslint-disable-next-line no-await-in-loop
       await savePatientDocument(patientId, file.originalname, url, appointmentId);
     }
   }
 
   return stored;
 }
-
-// Books an appointment, creating a patient account when the request is anonymous.
 async function bookAppointmentHandler(req, res) {
   const { availableTimeID, notes = '' } = req.body;
   const slotId = Number.parseInt(availableTimeID, 10);

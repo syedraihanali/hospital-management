@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { FaUserMd } from 'react-icons/fa';
 import { AuthContext } from '../../auth/context/AuthContext';
@@ -72,7 +72,7 @@ function StaffPortal() {
     []
   );
 
-  const normalizeDocuments = (raw) => {
+  const normalizeDocuments = useCallback((raw) => {
     if (!raw) {
       return [];
     }
@@ -85,13 +85,16 @@ function StaffPortal() {
     } catch (_err) {
       return [];
     }
-  };
+  }, []);
 
-  const normalizeAppointments = (data) =>
-    data.map((appointment) => ({
-      ...appointment,
-      PatientDocuments: normalizeDocuments(appointment.PatientDocuments),
-    }));
+  const normalizeAppointments = useCallback(
+    (data) =>
+      data.map((appointment) => ({
+        ...appointment,
+        PatientDocuments: normalizeDocuments(appointment.PatientDocuments),
+      })),
+    [normalizeDocuments]
+  );
 
   const parseTimeToMinutes = (time) => {
     const [hours, minutes] = time.split(':').map(Number);
@@ -105,7 +108,7 @@ function StaffPortal() {
     return `${year}-${month}-${day}`;
   };
 
-  const loadAvailability = async () => {
+  const loadAvailability = useCallback(async () => {
     if (!doctorId || !auth.token) {
       setAvailabilitySlots([]);
       return;
@@ -128,9 +131,9 @@ function StaffPortal() {
     } catch (err) {
       setAvailabilityFeedback({ type: 'error', message: err.message || 'Failed to load availability schedule.' });
     }
-  };
+  }, [apiBaseUrl, auth.token, doctorId]);
 
-  const fetchDoctorData = async () => {
+  const fetchDoctorData = useCallback(async () => {
     if (!doctorId || !auth.token) {
       return;
     }
@@ -180,7 +183,7 @@ function StaffPortal() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiBaseUrl, auth.token, doctorId, loadAvailability, normalizeAppointments]);
 
   const refreshAppointments = async () => {
     try {
@@ -202,8 +205,7 @@ function StaffPortal() {
 
   useEffect(() => {
     fetchDoctorData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doctorId]);
+  }, [fetchDoctorData]);
 
   const sortedAppointments = useMemo(
     () =>

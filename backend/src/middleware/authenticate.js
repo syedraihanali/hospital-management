@@ -1,7 +1,5 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config/env');
-
-// Verifies JWT bearer tokens and attaches the payload to the request context.
 function authenticateToken(req, res, next) {
   const authorizationHeader = req.headers.authorization;
   if (!authorizationHeader?.startsWith('Bearer ')) {

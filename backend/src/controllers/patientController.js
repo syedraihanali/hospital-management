@@ -10,8 +10,6 @@ const {
 } = require('../services/patientService');
 const { listAppointmentsForPatient } = require('../services/appointmentService');
 const { storeFile } = require('../services/storageService');
-
-// Registers a new patient and associates them with a doctor if capacity allows.
 async function registerPatient(req, res) {
   const { fullName, birthdate, gender, phoneNumber, email, password, address, nidNumber } = req.body;
 
@@ -27,9 +25,7 @@ async function registerPatient(req, res) {
   try {
     const uploadedRecords = [];
     const files = req.files?.medicalRecords || [];
-    // eslint-disable-next-line no-restricted-syntax
     for (const file of files) {
-      // eslint-disable-next-line no-await-in-loop
       const url = await storeFile(file, 'patient-documents');
       uploadedRecords.push({ name: file.originalname, url });
     }
@@ -54,14 +50,10 @@ async function registerPatient(req, res) {
     throw error;
   }
 }
-
-// Lists all registered patients. Requires authentication via middleware.
 async function getPatients(_req, res) {
   const patients = await listPatients();
   return res.json(patients);
 }
-
-// Retrieves a single patient record by identifier.
 async function getPatientByIdHandler(req, res) {
   const { id } = req.params;
 

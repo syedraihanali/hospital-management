@@ -1,6 +1,4 @@
 function errorHandler(err, req, res, next) {
-  // Log errors to help troubleshooting without leaking implementation details to clients.
-  // eslint-disable-next-line no-console
   console.error('Unhandled error:', err);
 
   if (res.headersSent) {

@@ -17,7 +17,6 @@ const {
 
 const router = Router();
 
-// Patient onboarding and data endpoints.
 router.post('/register', upload.array('medicalRecords', 6), asyncHandler(registerPatient));
 router.get('/', authenticateToken, authorizeRoles('admin'), asyncHandler(getPatients));
 router.get(

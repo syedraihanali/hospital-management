@@ -25,14 +25,10 @@ const {
   listPatientDocuments,
   listPatientReports,
 } = require('../services/patientService');
-
-// Returns the catalog of doctors available in the clinic.
 async function getDoctors(_req, res) {
   const doctors = await listDoctors();
   return res.json(doctors);
 }
-
-// Returns upcoming available time slots for a specific doctor.
 async function getDoctorAvailability(req, res) {
   const doctorId = Number.parseInt(req.params.id, 10);
 
@@ -64,8 +60,6 @@ async function getDoctorAvailabilityForManagement(req, res) {
   const availability = await listAvailabilityForDoctorManagement(doctorId);
   return res.json(availability);
 }
-
-// Provides upcoming appointments for the authenticated doctor.
 async function getDoctorAppointments(req, res) {
   const { id } = req.params;
 

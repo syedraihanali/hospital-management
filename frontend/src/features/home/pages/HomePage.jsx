@@ -103,9 +103,14 @@ function HomePage() {
 
   const heroBackgroundStyle = heroContent.imageUrl
     ? {
-        backgroundImage: `linear-gradient(135deg, rgba(7, 116, 105, 0.82), rgba(15, 23, 42, 0.78)), url(${heroContent.imageUrl})`,
+        backgroundImage: `url(${heroContent.imageUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
       }
     : {};
+  const heroOverlayStyle = {
+    background: 'linear-gradient(135deg, rgba(7, 116, 105, 0.35), rgba(15, 23, 42, 0.6))',
+  };
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-20 sm:px-6 lg:px-8">
@@ -113,7 +118,7 @@ function HomePage() {
         className="relative mt-6 overflow-hidden rounded-[40px] border border-white/30 bg-slate-900 text-white shadow-glass"
         style={heroBackgroundStyle}
       >
-        <div className="absolute inset-0 bg-cover bg-center" aria-hidden="true" style={heroBackgroundStyle} />
+        <div className="absolute inset-0" aria-hidden="true" style={heroOverlayStyle} />
         <div className="relative z-10 flex flex-col gap-8 p-10 md:flex-row md:items-center md:justify-between">
           <div className="max-w-2xl space-y-5">
             <span className="inline-flex items-center rounded-full bg-white/15 px-4 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-white/80">
@@ -131,10 +136,10 @@ function HomePage() {
                 {heroContent.ctaLabel}
               </Link>
               <Link
-                to="/services"
+                to="/specialists"
                 className="inline-flex items-center justify-center rounded-full border border-white/70 px-6 py-3 text-base font-semibold text-white transition hover:bg-white/10"
               >
-                Explore services
+                Meet our specialists
               </Link>
             </div>
             {heroStatus === 'failed' ? (
