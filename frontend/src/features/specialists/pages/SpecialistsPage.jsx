@@ -69,7 +69,7 @@ function SpecialistsPage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-12 px-4 pb-16 pt-4 sm:px-6 lg:px-8">
-      <section className="rounded-3xl border border-white/40 bg-white/80 p-10 shadow-glass backdrop-blur-xl">
+      {/* <section className="rounded-3xl border border-white/40 bg-white/80 p-10 shadow-glass backdrop-blur-xl">
         <div className="grid items-center gap-8 lg:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-6">
             <span className="inline-flex items-center rounded-full bg-brand-secondary px-4 py-1 text-xs font-semibold uppercase tracking-wide text-brand-dark">
@@ -106,7 +106,7 @@ function SpecialistsPage() {
             </Link>
           </div>
         </div>
-      </section>
+      </section> */}
 
       <section className="space-y-6">
         <div className="text-center">

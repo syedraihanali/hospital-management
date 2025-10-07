@@ -344,7 +344,7 @@ function ServicesPage() {
   return (
     <>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-12 px-4 pb-16 pt-4 sm:px-6 lg:px-8">
-        <section className="rounded-3xl border border-white/40 bg-white/80 p-10 shadow-glass backdrop-blur-xl">
+        {/* <section className="rounded-3xl border border-white/40 bg-white/80 p-10 shadow-glass backdrop-blur-xl">
           <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
             <div className="space-y-5">
               <span className="inline-flex items-center rounded-full bg-brand-secondary px-4 py-1 text-xs font-semibold uppercase tracking-wide text-brand-dark">
@@ -394,7 +394,7 @@ function ServicesPage() {
               </Link>
             </div>
           </div>
-        </section>
+        </section> */}
 
         <section className="space-y-6">
           <div className="text-center">
