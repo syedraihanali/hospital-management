@@ -4,6 +4,7 @@ import {
   FaCalendarCheck,
   FaClipboardList,
   FaFileMedical,
+  FaFlask,
   FaInfoCircle,
   FaNotesMedical,
   FaUserCheck,
@@ -16,6 +17,7 @@ function ReportsPage() {
   const [lookupError, setLookupError] = useState('');
   const [patient, setPatient] = useState(null);
   const [appointments, setAppointments] = useState([]);
+  const [labReports, setLabReports] = useState([]);
   const [verifiedNid, setVerifiedNid] = useState('');
   const [selectedAppointmentId, setSelectedAppointmentId] = useState('');
   const [assetsStatus, setAssetsStatus] = useState('idle');
@@ -37,6 +39,7 @@ function ReportsPage() {
     setAppointmentAssets(null);
     setSelectedAppointmentId('');
     setAssetsStatus('idle');
+    setLabReports([]);
 
     try {
       const response = await fetch(
@@ -52,11 +55,13 @@ function ReportsPage() {
       setPatient(data.patient);
       setAppointments(Array.isArray(data.appointments) ? data.appointments : []);
       setVerifiedNid(trimmedNid);
+      setLabReports(Array.isArray(data.labReports) ? data.labReports : []);
     } catch (error) {
       setLookupStatus('failed');
       setPatient(null);
       setAppointments([]);
       setVerifiedNid('');
+      setLabReports([]);
       setLookupError(error.message || 'Something went wrong while searching for appointments.');
     }
   };
@@ -86,6 +91,9 @@ function ReportsPage() {
 
       setAppointmentAssets(data);
       setAssetsStatus('succeeded');
+      if (Array.isArray(data.labReports)) {
+        setLabReports(data.labReports);
+      }
     } catch (error) {
       setAssetsStatus('failed');
       setAppointmentAssets(null);
@@ -103,6 +111,7 @@ function ReportsPage() {
     setAssetsError('');
     setLookupStatus('idle');
     setAssetsStatus('idle');
+    setLabReports([]);
   };
 
   const selectedAppointment = useMemo(() => {
@@ -150,6 +159,11 @@ function ReportsPage() {
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  const formatCurrency = (value) => {
+    const amount = Number.parseFloat(value ?? 0) || 0;
+    return `BDT ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   return (
@@ -386,6 +400,66 @@ function ReportsPage() {
             <div className="rounded-3xl border border-dashed border-slate-300 bg-white/70 p-6 text-sm text-slate-500">
               No doctor reports were attached to this appointment. Contact your provider if you were expecting one.
             </div>
+          ) : null}
+
+          {labReports.length ? (
+            <article className="space-y-4 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card">
+              <header className="flex items-center gap-3">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                  <FaFlask aria-hidden="true" />
+                </span>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Lab reports shared by admin</h3>
+                  <p className="text-sm text-slate-600">Track diagnostic files, applied package discounts, and final charges.</p>
+                </div>
+              </header>
+              <ul className="grid gap-3">
+                {labReports.map((report) => (
+                  <li
+                    key={report.LabReportID ?? report.ReportID ?? report.Title}
+                    className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/90 p-4 text-sm text-slate-700 shadow-sm"
+                  >
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="font-semibold text-slate-900">{report.Title}</p>
+                        <p className="text-xs text-slate-500">
+                          {report.TestName ? `${report.TestName} · ` : ''}
+                          Shared {formatDateTime(report.CreatedAt)} by {report.AdminName || 'Administrator'}
+                        </p>
+                      </div>
+                      <a
+                        href={report.FileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center rounded-full border border-brand-primary px-4 py-2 text-xs font-semibold text-brand-primary transition hover:bg-brand-primary hover:text-white"
+                      >
+                        Download report
+                      </a>
+                    </div>
+                    <div className="grid gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-600 sm:grid-cols-3">
+                      <div>
+                        <p className="font-semibold text-slate-700">Base charge</p>
+                        <p className="text-sm text-brand-primary">{formatCurrency(report.BaseCharge)}</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-700">Package discount</p>
+                        <p className="text-sm text-emerald-600">{formatCurrency(report.DiscountAmount)}</p>
+                        {report.PackageName ? (
+                          <p className="text-[11px] text-slate-500">{report.PackageName}</p>
+                        ) : null}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-700">Final payable</p>
+                        <p className="text-sm text-brand-dark">{formatCurrency(report.FinalCharge)}</p>
+                      </div>
+                    </div>
+                    {report.Description ? (
+                      <p className="text-xs text-slate-600">{report.Description}</p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </article>
           ) : null}
 
           <div className="rounded-3xl border border-emerald-100 bg-emerald-50/80 p-6 text-sm text-emerald-700">

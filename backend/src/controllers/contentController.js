@@ -3,6 +3,7 @@ const {
   getServicePackages,
   getSiteSettings,
   getHomeHeroContent,
+  getLabTests,
 } = require('../services/contentService');
 
 async function fetchAboutContent(_req, res) {
@@ -13,6 +14,11 @@ async function fetchAboutContent(_req, res) {
 async function fetchServicePackages(_req, res) {
   const packages = await getServicePackages();
   res.json(packages);
+}
+
+async function fetchLabTests(_req, res) {
+  const tests = await getLabTests();
+  res.json(tests);
 }
 
 async function fetchSiteSettings(_req, res) {
@@ -28,6 +34,7 @@ async function fetchHomeHeroContent(_req, res) {
 module.exports = {
   fetchAboutContent,
   fetchServicePackages,
+  fetchLabTests,
   fetchSiteSettings,
   fetchHomeHeroContent,
 };

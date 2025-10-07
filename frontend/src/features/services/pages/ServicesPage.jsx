@@ -9,40 +9,97 @@ const formatCurrency = (value) => {
   return `BDT ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
+const formatPercentage = (value) => {
+  if (!Number.isFinite(value)) {
+    return '0%';
+  }
+  return `${(value * 100).toFixed(0)}%`;
+};
+
 function ServicesPage() {
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [labTests, setLabTests] = useState([]);
+  const [labStatus, setLabStatus] = useState('idle');
+  const [labError, setLabError] = useState('');
   const { siteSettings } = useSiteSettings();
 
   const siteName = siteSettings?.siteName ?? 'Destination Health';
 
   useEffect(() => {
-    const fetchPackages = async () => {
+    let cancelled = false;
+
+    const loadPackages = async () => {
       setLoading(true);
       setError('');
 
       try {
         const response = await fetch(`${apiBaseUrl}/api/content/service-packages`);
+        const data = await response.json().catch(() => []);
+
         if (!response.ok) {
-          throw new Error('Unable to load service packages.');
+          throw new Error(data.message || 'Unable to load service packages.');
         }
 
-        const data = await response.json();
-        setPackages(Array.isArray(data) ? data : []);
+        if (!cancelled) {
+          setPackages(Array.isArray(data) ? data : []);
+        }
       } catch (err) {
-        setError(err.message || 'An unexpected error occurred while loading the packages.');
+        if (!cancelled) {
+          setPackages([]);
+          setError(err.message || 'An unexpected error occurred while loading the packages.');
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
-    fetchPackages();
+    const loadLabTests = async () => {
+      setLabStatus('loading');
+      setLabError('');
+
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/content/lab-tests`);
+        const data = await response.json().catch(() => []);
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Unable to load lab test pricing.');
+        }
+
+        if (!cancelled) {
+          setLabTests(Array.isArray(data) ? data : []);
+          setLabStatus('succeeded');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setLabTests([]);
+          setLabStatus('failed');
+          setLabError(err.message || 'Unable to load lab test pricing.');
+        }
+      }
+    };
+
+    loadPackages();
+    loadLabTests();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const sortedPackages = useMemo(() => {
     return [...packages].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   }, [packages]);
+
+  const displayedPackages = useMemo(() => {
+    if (!sortedPackages.length) {
+      return [];
+    }
+    return sortedPackages.slice(1);
+  }, [sortedPackages]);
 
   if (loading) {
     return (
@@ -68,10 +125,13 @@ function ServicesPage() {
             <span className="inline-flex items-center rounded-full bg-brand-secondary px-4 py-1 text-xs font-semibold uppercase tracking-wide text-brand-dark">
               {siteName} Packages
             </span>
-            <h1 className="text-3xl font-semibold text-slate-900 sm:text-4xl lg:text-5xl">Preventive health, designed for every stage of life</h1>
+            <h1 className="text-3xl font-semibold text-slate-900 sm:text-4xl lg:text-5xl">
+              Preventive health, designed for every stage of life
+            </h1>
             <p className="text-base text-slate-600 sm:text-lg">
               From essential checkups to advanced diagnostics, each package blends laboratory tests, imaging, and consultations
-              so you can take proactive steps toward long-term wellness.
+              so you can take proactive steps toward long-term wellness. Pay only for the lab investigations you need and see
+              how bundled packages lower the final bill instantly.
             </p>
             <div className="grid gap-4 rounded-2xl border border-brand-primary/20 bg-brand-primary/10 p-5 text-sm text-brand-dark sm:grid-cols-2">
               <div>
@@ -112,7 +172,7 @@ function ServicesPage() {
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {sortedPackages.map((pkg) => {
+          {displayedPackages.map((pkg) => {
             const packageItems = Array.isArray(pkg.items) ? pkg.items : [];
             const totalPrice = packageItems.reduce((sum, item) => sum + (Number.parseFloat(item.price ?? 0) || 0), 0);
             const discountedPrice = Number.parseFloat(pkg.discountedPrice ?? pkg.totalPrice ?? 0) || 0;
@@ -180,7 +240,63 @@ function ServicesPage() {
               </article>
             );
           })}
+          {!displayedPackages.length ? (
+            <div className="rounded-3xl border border-dashed border-slate-300 bg-white/80 p-8 text-center text-sm text-slate-500">
+              Service packages will appear here once they are published.
+            </div>
+          ) : null}
         </div>
+      </section>
+
+      <section className="space-y-6">
+        <div className="text-center">
+          <h2 className="text-3xl font-semibold text-slate-900 sm:text-4xl">Understand lab test pricing</h2>
+          <p className="mt-2 text-sm text-slate-600 sm:text-base">
+            Review individual lab charges and see how applying a preventive package instantly reduces your payable amount.
+          </p>
+        </div>
+
+        {labStatus === 'failed' ? (
+          <div className="rounded-3xl border border-rose-200 bg-rose-50/70 p-6 text-sm font-medium text-rose-600">
+            {labError || 'We could not load lab test pricing right now. Please try again shortly.'}
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white/95 shadow-card">
+            <div className="hidden bg-slate-50/80 px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500 md:grid md:grid-cols-[2fr_1fr_1fr_1fr_1fr]">
+              <span>Test</span>
+              <span>Base charge</span>
+              <span>Package</span>
+              <span>Discount</span>
+              <span>Final payable</span>
+            </div>
+            <ul className="divide-y divide-slate-100">
+              {(labTests || []).map((test) => (
+                <li key={test.id ?? test.name} className="grid gap-3 px-6 py-5 text-sm text-slate-700 md:grid-cols-[2fr_1fr_1fr_1fr_1fr] md:items-center">
+                  <div>
+                    <p className="font-semibold text-slate-900">{test.name}</p>
+                    {test.description ? <p className="text-xs text-slate-500">{test.description}</p> : null}
+                  </div>
+                  <span className="font-semibold text-brand-primary">{formatCurrency(test.basePrice)}</span>
+                  <div className="text-xs text-slate-500">
+                    {test.packageName ? (
+                      <>
+                        <p className="font-semibold text-slate-700">{test.packageName}</p>
+                        <p>{formatPercentage(test.discountRate)} off</p>
+                      </>
+                    ) : (
+                      <p className="text-slate-400">Not bundled</p>
+                    )}
+                  </div>
+                  <span className="font-semibold text-emerald-600">{formatCurrency(test.discountAmount)}</span>
+                  <span className="font-semibold text-brand-dark">{formatCurrency(test.finalPrice)}</span>
+                </li>
+              ))}
+              {!labTests.length && labStatus !== 'failed' ? (
+                <li className="px-6 py-5 text-sm text-slate-500">No lab tests have been published yet.</li>
+              ) : null}
+            </ul>
+          </div>
+        )}
       </section>
     </div>
   );
