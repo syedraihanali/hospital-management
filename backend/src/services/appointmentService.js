@@ -1,4 +1,20 @@
 const { execute, transaction } = require('../database/query');
+
+const ALLOWED_PAYMENT_METHODS = ['bkash', 'nagad', 'card'];
+const DEFAULT_PAYMENT_CURRENCY = 'BDT';
+
+function normalizeTimeValue(time) {
+  if (!time) {
+    return time;
+  }
+
+  const trimmed = String(time).trim();
+  if (/^\d{2}:\d{2}$/.test(trimmed)) {
+    return `${trimmed}:00`;
+  }
+
+  return trimmed;
+}
 async function getUpcomingAppointments(patientId) {
   return execute(
     `SELECT
@@ -58,6 +74,8 @@ async function getAvailableTimes(doctorId) {
         AvailableTimeID,
         DoctorID,
         DATE_FORMAT(ScheduleDate, '%Y-%m-%d') AS ScheduleDate,
+        DayOfWeek,
+        DATE_FORMAT(ScheduleDate, '%W') AS DayName,
         TIME_FORMAT(StartTime, '%H:%i') AS StartTime,
         TIME_FORMAT(EndTime, '%H:%i') AS EndTime
       FROM available_time
@@ -66,10 +84,13 @@ async function getAvailableTimes(doctorId) {
     [doctorId]
   );
 }
-async function bookAppointment({ patientId, availableTimeId, notes = '' }) {
+async function bookAppointment({ patientId, availableTimeId, notes = '', payment }) {
   return transaction(async (connection) => {
     const [timeSlots] = await connection.execute(
-      'SELECT * FROM available_time WHERE AvailableTimeID = ? AND IsAvailable = 1 FOR UPDATE',
+      `SELECT at.*, d.ConsultationFee
+         FROM available_time at
+         JOIN doctors d ON at.DoctorID = d.DoctorID
+        WHERE at.AvailableTimeID = ? AND at.IsAvailable = 1 FOR UPDATE`,
       [availableTimeId]
     );
     const timeSlot = timeSlots[0];
@@ -80,6 +101,47 @@ async function bookAppointment({ patientId, availableTimeId, notes = '' }) {
       throw error;
     }
 
+    if (!payment || typeof payment !== 'object') {
+      const error = new Error('Payment details are required to confirm the booking.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const paymentMethod = String(payment.method || '').toLowerCase();
+    if (!ALLOWED_PAYMENT_METHODS.includes(paymentMethod)) {
+      const error = new Error('Unsupported payment method provided.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const paymentAmount = Number.parseFloat(payment.amount);
+    if (!Number.isFinite(paymentAmount) || paymentAmount < 0) {
+      const error = new Error('Payment amount must be a positive number.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const expectedFee = Number.parseFloat(timeSlot.ConsultationFee ?? 0);
+    const roundedAmount = Number.parseFloat(paymentAmount.toFixed(2));
+    const roundedFee = Number.parseFloat(expectedFee.toFixed(2));
+
+    if (Math.abs(roundedAmount - roundedFee) > 0.01) {
+      const error = new Error('Payment amount does not match the consultation fee.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const paymentCurrency = String(payment.currency || DEFAULT_PAYMENT_CURRENCY).toUpperCase();
+    const paymentReference = payment.reference ? String(payment.reference).trim() : '';
+
+    if (paymentMethod !== 'card' && !paymentReference) {
+      const error = new Error('A transaction reference is required for mobile wallet payments.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const paymentReferenceValue = paymentReference || null;
+
     const [appointmentResult] = await connection.execute(
       `INSERT INTO appointments (PatientID, DoctorID, AvailableTimeID, Status, Notes)
        VALUES (?, ?, ?, 'pending', ?)`,
@@ -89,14 +151,28 @@ async function bookAppointment({ patientId, availableTimeId, notes = '' }) {
     await connection.execute('UPDATE available_time SET IsAvailable = 0 WHERE AvailableTimeID = ?', [
       availableTimeId,
     ]);
+    const appointmentId = appointmentResult.insertId;
+
+    await connection.execute(
+      `INSERT INTO payments (AppointmentID, Amount, Currency, Method, Status, TransactionReference)
+       VALUES (?, ?, ?, ?, 'paid', ?)`,
+      [appointmentId, roundedAmount, paymentCurrency, paymentMethod, paymentReferenceValue]
+    );
 
     return {
-      appointmentId: appointmentResult.insertId,
+      appointmentId,
       doctorId: timeSlot.DoctorID,
       scheduleDate: timeSlot.ScheduleDate,
       startTime: timeSlot.StartTime,
       endTime: timeSlot.EndTime,
       notes: notes || null,
+      payment: {
+        amount: roundedAmount,
+        currency: paymentCurrency,
+        method: paymentMethod,
+        reference: paymentReferenceValue,
+        status: 'paid',
+      },
     };
   });
 }
@@ -106,10 +182,20 @@ async function createAvailabilitySlots(doctorId, slots) {
     return;
   }
 
-  const values = slots.map(({ date, startTime, endTime }) => [doctorId, date, startTime, endTime]);
+  const values = slots.map(({ date, startTime, endTime }) => {
+    const slotDate = new Date(`${date}T00:00:00`);
+    const dayOfWeek = Number.isNaN(slotDate.getTime()) ? null : slotDate.getDay();
+    return [
+      doctorId,
+      date,
+      dayOfWeek ?? 0,
+      normalizeTimeValue(startTime),
+      normalizeTimeValue(endTime),
+    ];
+  });
   await execute(
-    `INSERT INTO available_time (DoctorID, ScheduleDate, StartTime, EndTime, IsAvailable)
-     VALUES ${values.map(() => '(?, ?, ?, ?, 1)').join(', ')}`,
+    `INSERT INTO available_time (DoctorID, ScheduleDate, DayOfWeek, StartTime, EndTime, IsAvailable)
+     VALUES ${values.map(() => '(?, ?, ?, ?, ?, 1)').join(', ')}`,
     values.flat()
   );
 }
@@ -120,6 +206,8 @@ async function listAvailabilityForDoctorManagement(doctorId) {
         AvailableTimeID,
         DoctorID,
         DATE_FORMAT(ScheduleDate, '%Y-%m-%d') AS ScheduleDate,
+        DayOfWeek,
+        DATE_FORMAT(ScheduleDate, '%W') AS DayName,
         TIME_FORMAT(StartTime, '%H:%i') AS StartTime,
         TIME_FORMAT(EndTime, '%H:%i') AS EndTime,
         IsAvailable
@@ -164,6 +252,12 @@ async function listAppointmentsForDoctor(doctorId) {
         DATE_FORMAT(at.ScheduleDate, '%Y-%m-%d') AS ScheduleDate,
         TIME_FORMAT(at.StartTime, '%H:%i') AS StartTime,
         TIME_FORMAT(at.EndTime, '%H:%i') AS EndTime,
+        pay.Amount AS PaymentAmount,
+        pay.Currency AS PaymentCurrency,
+        pay.Method AS PaymentMethod,
+        pay.Status AS PaymentStatus,
+        pay.TransactionReference AS PaymentReference,
+        DATE_FORMAT(pay.PaidAt, '%Y-%m-%dT%H:%i:%sZ') AS PaymentDate,
         (
           SELECT JSON_ARRAYAGG(
             JSON_OBJECT(
@@ -179,6 +273,7 @@ async function listAppointmentsForDoctor(doctorId) {
      FROM appointments a
      JOIN patients p ON a.PatientID = p.PatientID
      JOIN available_time at ON a.AvailableTimeID = at.AvailableTimeID
+     LEFT JOIN payments pay ON pay.AppointmentID = a.AppointmentID
      WHERE a.DoctorID = ?
      ORDER BY at.ScheduleDate DESC, at.StartTime DESC`,
     [doctorId]
@@ -215,10 +310,17 @@ async function listAppointmentsForPatient(patientId) {
         d.FullName AS DoctorName,
         DATE_FORMAT(at.ScheduleDate, '%Y-%m-%d') AS ScheduleDate,
         TIME_FORMAT(at.StartTime, '%H:%i') AS StartTime,
-        TIME_FORMAT(at.EndTime, '%H:%i') AS EndTime
+        TIME_FORMAT(at.EndTime, '%H:%i') AS EndTime,
+        pay.Amount AS PaymentAmount,
+        pay.Currency AS PaymentCurrency,
+        pay.Method AS PaymentMethod,
+        pay.Status AS PaymentStatus,
+        pay.TransactionReference AS PaymentReference,
+        DATE_FORMAT(pay.PaidAt, '%Y-%m-%dT%H:%i:%sZ') AS PaymentDate
      FROM appointments a
      JOIN doctors d ON a.DoctorID = d.DoctorID
      JOIN available_time at ON a.AvailableTimeID = at.AvailableTimeID
+     LEFT JOIN payments pay ON pay.AppointmentID = a.AppointmentID
      WHERE a.PatientID = ?
      ORDER BY at.ScheduleDate DESC, at.StartTime DESC`,
     [patientId]

@@ -10,9 +10,6 @@ function DoctorAvailabilityPlanner({
   onClearDays,
   onPlannerFieldChange,
   onCustomTimeToggle,
-  onCustomDateChange,
-  onAddCustomDate,
-  onRemoveCustomDate,
   onSubmit,
   startTimeOptions,
   endTimeOptions,
@@ -23,7 +20,7 @@ function DoctorAvailabilityPlanner({
         <div>
           <h2 className="text-xl font-semibold text-brand-primary">Plan your availability</h2>
           <p className="mt-1 text-xs text-slate-500">
-            Select weekly days or custom dates, then choose the hours you are available for appointments.
+            Select the days you are available each week and we&apos;ll automatically schedule the upcoming weeks for you.
           </p>
         </div>
       </div>
@@ -76,52 +73,33 @@ function DoctorAvailabilityPlanner({
           </div>
         </div>
 
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Custom dates</p>
-          <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
-            <input
-              type="date"
-              value={planner.customDateInput}
-              onChange={onCustomDateChange}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent sm:max-w-xs"
-            />
-            <button
-              type="button"
-              onClick={onAddCustomDate}
-              className="inline-flex items-center justify-center rounded-full border border-brand-primary px-4 py-2 text-xs font-semibold text-brand-primary transition hover:bg-brand-primary hover:text-white"
-            >
-              Add date
-            </button>
+        <div className="grid gap-3 sm:grid-cols-2 sm:items-end">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Planning horizon</p>
+            <p className="mt-1 text-xs text-slate-400">
+              We&apos;ll duplicate your selected weekdays for the upcoming weeks so patients can book recurring slots.
+            </p>
           </div>
-          {planner.customDates.length ? (
-            <ul className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
-              {planner.customDates.map((date) => (
-                <li
-                  key={date}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1"
-                >
-                  <span>
-                    {new Date(`${date}T00:00`).toLocaleDateString('en-US', {
-                      weekday: 'short',
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onRemoveCustomDate(date)}
-                    className="text-slate-400 transition hover:text-rose-500"
-                    aria-label={`Remove ${date}`}
-                  >
-                    &times;
-                  </button>
-                </li>
+          <label className="flex flex-col text-xs font-semibold text-slate-600">
+            Generate availability for
+            <select
+              name="weeksToGenerate"
+              value={planner.weeksToGenerate}
+              onChange={onPlannerFieldChange}
+              className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+            >
+              {[1, 2, 3, 4, 5, 6].map((weeks) => (
+                <option key={weeks} value={weeks}>
+                  {weeks} week{weeks === 1 ? '' : 's'} ahead
+                </option>
               ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-xs text-slate-400">Optional: select specific dates outside your weekly routine.</p>
-          )}
+            </select>
+          </label>
         </div>
+        <p className="text-xs text-slate-500">
+          New slots will be added for the next {planner.weeksToGenerate}{' '}
+          week{planner.weeksToGenerate === 1 ? '' : 's'} on the selected days.
+        </p>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="flex flex-col text-xs font-semibold text-slate-600">
@@ -214,13 +192,12 @@ DoctorAvailabilityPlanner.propTypes = {
   ).isRequired,
   planner: PropTypes.shape({
     selectedDays: PropTypes.arrayOf(PropTypes.number).isRequired,
-    customDates: PropTypes.arrayOf(PropTypes.string).isRequired,
-    customDateInput: PropTypes.string.isRequired,
     startTime: PropTypes.string.isRequired,
     endTime: PropTypes.string.isRequired,
     useCustomTime: PropTypes.bool.isRequired,
     customStartTime: PropTypes.string,
     customEndTime: PropTypes.string,
+    weeksToGenerate: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
   }).isRequired,
   availabilityFeedback: PropTypes.shape({
     type: PropTypes.oneOf(['success', 'error']).isRequired,
@@ -231,9 +208,6 @@ DoctorAvailabilityPlanner.propTypes = {
   onClearDays: PropTypes.func.isRequired,
   onPlannerFieldChange: PropTypes.func.isRequired,
   onCustomTimeToggle: PropTypes.func.isRequired,
-  onCustomDateChange: PropTypes.func.isRequired,
-  onAddCustomDate: PropTypes.func.isRequired,
-  onRemoveCustomDate: PropTypes.func.isRequired,
   onSubmit: PropTypes.func.isRequired,
   startTimeOptions: PropTypes.arrayOf(PropTypes.string).isRequired,
   endTimeOptions: PropTypes.arrayOf(PropTypes.string).isRequired,

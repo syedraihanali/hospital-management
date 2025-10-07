@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const { execute, transaction } = require('../database/query');
+const { ensureDefaultAvailabilityForDoctor } = require('../database/schema');
 async function listDoctors() {
   return execute(
     `SELECT
@@ -11,6 +12,7 @@ async function listDoctors() {
         d.PhoneNumber,
         d.Specialization,
         d.AvatarUrl,
+        d.ConsultationFee,
         (
           SELECT DATE_FORMAT(at.ScheduleDate, '%Y-%m-%d')
           FROM available_time at
@@ -18,6 +20,20 @@ async function listDoctors() {
           ORDER BY at.ScheduleDate ASC, at.StartTime ASC
           LIMIT 1
         ) AS NextScheduleDate,
+        (
+          SELECT DAYOFWEEK(at.ScheduleDate) - 1
+          FROM available_time at
+          WHERE at.DoctorID = d.DoctorID AND at.IsAvailable = 1 AND at.ScheduleDate >= CURDATE()
+          ORDER BY at.ScheduleDate ASC, at.StartTime ASC
+          LIMIT 1
+        ) AS NextScheduleDayOfWeek,
+        (
+          SELECT DATE_FORMAT(at.ScheduleDate, '%W')
+          FROM available_time at
+          WHERE at.DoctorID = d.DoctorID AND at.IsAvailable = 1 AND at.ScheduleDate >= CURDATE()
+          ORDER BY at.ScheduleDate ASC, at.StartTime ASC
+          LIMIT 1
+        ) AS NextScheduleDayName,
         (
           SELECT TIME_FORMAT(at.StartTime, '%H:%i')
           FROM available_time at
@@ -173,7 +189,7 @@ async function reviewDoctorApplication({ applicationId, status, reviewerUserId, 
 }
 
 async function createDoctorFromApplication(applicationId, defaultPassword = 'Doctor@123') {
-  return transaction(async (connection) => {
+  const doctorId = await transaction(async (connection) => {
     const [applications] = await connection.execute(
       'SELECT * FROM doctor_applications WHERE ApplicationID = ? FOR UPDATE',
       [applicationId]
@@ -193,8 +209,8 @@ async function createDoctorFromApplication(applicationId, defaultPassword = 'Doc
     }
 
     const [result] = await connection.execute(
-      `INSERT INTO doctors (FullName, MaxPatientNumber, CurrentPatientNumber, Email, PhoneNumber, Specialization)
-       VALUES (?, ?, 0, ?, ?, ?)`,
+      `INSERT INTO doctors (FullName, MaxPatientNumber, CurrentPatientNumber, Email, PhoneNumber, Specialization, ConsultationFee)
+       VALUES (?, ?, 0, ?, ?, ?, 1500)`,
       [
         application.FullName,
         100,
@@ -217,14 +233,27 @@ async function createDoctorFromApplication(applicationId, defaultPassword = 'Doc
 
     return doctorId;
   });
+
+  await ensureDefaultAvailabilityForDoctor(doctorId);
+  return doctorId;
 }
 
-async function updateDoctorProfile(doctorId, { fullName, email, phoneNumber, specialization, avatarUrl }) {
+async function updateDoctorProfile(
+  doctorId,
+  { fullName, email, phoneNumber, specialization, avatarUrl, consultationFee }
+) {
   const sanitizedFullName = sanitize(fullName);
   const sanitizedEmail = sanitize(email).toLowerCase();
   const sanitizedPhoneNumber = sanitize(phoneNumber);
   const sanitizedSpecialization =
     specialization === undefined || specialization === null ? null : String(specialization).trim();
+  const feeValue = Number.parseFloat(consultationFee);
+
+  if (Number.isNaN(feeValue) || feeValue < 0) {
+    const error = new Error('Consultation fee must be a positive number.');
+    error.statusCode = 400;
+    throw error;
+  }
 
   if (!sanitizedFullName || !sanitizedEmail || !sanitizedPhoneNumber) {
     const error = new Error('Full name, email, and phone number are required.');
@@ -260,9 +289,17 @@ async function updateDoctorProfile(doctorId, { fullName, email, phoneNumber, spe
 
   await execute(
     `UPDATE doctors
-     SET FullName = ?, Email = ?, PhoneNumber = ?, Specialization = ?, AvatarUrl = ?
+     SET FullName = ?, Email = ?, PhoneNumber = ?, Specialization = ?, AvatarUrl = ?, ConsultationFee = ?
      WHERE DoctorID = ?`,
-    [sanitizedFullName, sanitizedEmail, sanitizedPhoneNumber, sanitizedSpecialization, avatarUrl, doctorId]
+    [
+      sanitizedFullName,
+      sanitizedEmail,
+      sanitizedPhoneNumber,
+      sanitizedSpecialization,
+      avatarUrl,
+      feeValue,
+      doctorId,
+    ]
   );
 
   await execute('UPDATE users SET Email = ? WHERE DoctorID = ?', [sanitizedEmail, doctorId]);

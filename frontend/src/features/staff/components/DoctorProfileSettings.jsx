@@ -70,6 +70,22 @@ function DoctorProfileSettings({
           />
         </label>
         <label className="flex flex-col text-xs font-semibold text-slate-600">
+          Consultation fee (BDT)
+          <input
+            type="number"
+            name="consultationFee"
+            min="0"
+            step="0.01"
+            value={profileForm.consultationFee}
+            onChange={onProfileChange}
+            required
+            className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+          />
+          <span className="mt-1 text-[11px] font-normal text-slate-400">
+            Patients will pay this amount when booking an appointment with you.
+          </span>
+        </label>
+        <label className="flex flex-col text-xs font-semibold text-slate-600">
           Profile photo
           <input
             type="file"
@@ -129,6 +145,7 @@ DoctorProfileSettings.propTypes = {
     phoneNumber: PropTypes.string.isRequired,
     specialization: PropTypes.string,
     avatarUrl: PropTypes.string,
+    consultationFee: PropTypes.string.isRequired,
   }).isRequired,
   onProfileChange: PropTypes.func.isRequired,
   onProfileSubmit: PropTypes.func.isRequired,
