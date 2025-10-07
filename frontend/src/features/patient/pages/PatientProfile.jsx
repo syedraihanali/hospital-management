@@ -120,6 +120,12 @@ function PatientProfile() {
         dateValue: entryDate,
         displayDate,
         timeRange,
+        payment: {
+          amount: appointment.PaymentAmount,
+          status: appointment.PaymentStatus || 'paid',
+          method: appointment.PaymentMethod || '',
+          reference: appointment.PaymentReference || '',
+        },
       };
     });
 
@@ -622,6 +628,37 @@ function PatientProfile() {
                       {entry.timeRange ? ` · ${entry.timeRange}` : ''}
                     </p>
                     {entry.notes ? <p className="mt-2 text-xs text-slate-600">{entry.notes}</p> : null}
+                    {(() => {
+                      if (!entry.payment) {
+                        return null;
+                      }
+                      const amountValue =
+                        typeof entry.payment.amount === 'number' ||
+                        (typeof entry.payment.amount === 'string' && entry.payment.amount !== '')
+                          ? Number(entry.payment.amount).toLocaleString('en-US', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })
+                          : null;
+                      const methodLabel = entry.payment.method
+                        ? `${entry.payment.method.charAt(0).toUpperCase()}${entry.payment.method.slice(1)}`
+                        : 'Not recorded';
+                      const status = entry.payment.status || 'paid';
+                      const statusColor =
+                        status === 'paid'
+                          ? 'text-emerald-600'
+                          : status === 'refunded'
+                          ? 'text-slate-500'
+                          : 'text-amber-600';
+
+                      return (
+                        <p className={`mt-2 text-xs ${statusColor}`}>
+                          {status === 'paid' ? 'Paid' : status === 'refunded' ? 'Refunded' : 'Payment pending'}
+                          {amountValue ? ` · BDT ${amountValue}` : ''} via {methodLabel}
+                          {entry.payment.reference ? ` • Ref: ${entry.payment.reference}` : ''}
+                        </p>
+                      );
+                    })()}
                   </div>
                 </div>
               </article>

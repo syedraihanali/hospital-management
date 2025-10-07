@@ -51,10 +51,11 @@ async function populateAvailableTime() {
         const endTime = formatTime(hour + 1);
 
         for (const doctorID of doctorIDs) {
+          const dayOfWeek = currentDate.getDay();
           const isAvailable = Math.random() < 0.7 ? 1 : 0;
           await connection.execute(
-            'INSERT INTO available_time (DoctorID, ScheduleDate, StartTime, EndTime, IsAvailable) VALUES (?, ?, ?, ?, ?)',
-            [doctorID, formattedDate, startTime, endTime, isAvailable]
+            'INSERT INTO available_time (DoctorID, ScheduleDate, DayOfWeek, StartTime, EndTime, IsAvailable) VALUES (?, ?, ?, ?, ?, ?)',
+            [doctorID, formattedDate, dayOfWeek, startTime, endTime, isAvailable]
           );
           totalInserts += 1;
         }

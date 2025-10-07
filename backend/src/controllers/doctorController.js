@@ -255,7 +255,7 @@ async function updateDoctorProfileHandler(req, res) {
     return res.status(403).json({ message: 'Access denied.' });
   }
 
-  const { fullName, email, phoneNumber, specialization } = req.body;
+  const { fullName, email, phoneNumber, specialization, consultationFee } = req.body;
 
   if (!fullName || !email || !phoneNumber) {
     return res.status(400).json({ message: 'Full name, email, and phone number are required.' });
@@ -275,6 +275,7 @@ async function updateDoctorProfileHandler(req, res) {
     phoneNumber,
     specialization,
     avatarUrl,
+    consultationFee: consultationFee ?? doctor.ConsultationFee,
   });
 
   return res.json({ message: 'Profile updated successfully.', avatarUrl });

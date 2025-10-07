@@ -20,13 +20,12 @@ function StaffPortal() {
   const [error, setError] = useState('');
   const createDefaultPlannerState = () => ({
     selectedDays: [],
-    customDates: [],
-    customDateInput: '',
     startTime: '09:00',
     endTime: '17:00',
     useCustomTime: false,
     customStartTime: '',
     customEndTime: '',
+    weeksToGenerate: '4',
   });
   const [availabilityPlanner, setAvailabilityPlanner] = useState(createDefaultPlannerState);
   const [availabilitySlots, setAvailabilitySlots] = useState([]);
@@ -176,6 +175,9 @@ function StaffPortal() {
         specialization: profileData.Specialization || '',
         avatarUrl: profileData.AvatarUrl || '',
         avatarFile: null,
+        consultationFee: profileData.ConsultationFee !== undefined && profileData.ConsultationFee !== null
+          ? String(profileData.ConsultationFee)
+          : '0',
       });
       await loadAvailability();
     } catch (err) {
@@ -252,60 +254,27 @@ function StaffPortal() {
     }));
   };
 
-  const handleCustomDateInputChange = (event) => {
-    setAvailabilityPlanner((prev) => ({ ...prev, customDateInput: event.target.value }));
-  };
-
-  const handleAddCustomDate = () => {
-    const dateValue = availabilityPlanner.customDateInput;
-    if (!dateValue) {
-      return;
-    }
-
-    const selectedDate = new Date(dateValue);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (Number.isNaN(selectedDate.getTime()) || selectedDate < today) {
-      setAvailabilityFeedback({ type: 'error', message: 'Choose a future date for custom availability.' });
-      return;
-    }
-
-    if (availabilityPlanner.customDates.includes(dateValue)) {
-      setAvailabilityPlanner((prev) => ({ ...prev, customDateInput: '' }));
-      return;
-    }
-
-    setAvailabilityPlanner((prev) => ({
-      ...prev,
-      customDates: [...prev.customDates, dateValue].sort(),
-      customDateInput: '',
-    }));
-  };
-
-  const handleRemoveCustomDate = (date) => {
-    setAvailabilityPlanner((prev) => ({
-      ...prev,
-      customDates: prev.customDates.filter((item) => item !== date),
-    }));
-  };
-
   const handleAvailabilitySubmit = async (event) => {
     event.preventDefault();
     setAvailabilityFeedback(null);
 
     const {
       selectedDays,
-      customDates,
       startTime,
       endTime,
       useCustomTime,
       customStartTime,
       customEndTime,
+      weeksToGenerate,
     } = availabilityPlanner;
 
     const startValue = useCustomTime ? customStartTime : startTime;
     const endValue = useCustomTime ? customEndTime : endTime;
+
+    if (!selectedDays.length) {
+      setAvailabilityFeedback({ type: 'error', message: 'Select at least one weekday to plan your availability.' });
+      return;
+    }
 
     if (!startValue || !endValue) {
       setAvailabilityFeedback({ type: 'error', message: 'Select both a start time and an end time.' });
@@ -319,28 +288,22 @@ function StaffPortal() {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const selectedDatesSet = new Set(customDates);
 
-    if (selectedDays.length) {
-      for (let offset = 0; offset < 28; offset += 1) {
-        const candidate = new Date(today);
-        candidate.setDate(today.getDate() + offset);
-        if (selectedDays.includes(candidate.getDay())) {
-          selectedDatesSet.add(formatDateValue(candidate));
-        }
+    const weeks = Number.parseInt(weeksToGenerate, 10);
+    const weeksCount = Number.isNaN(weeks) || weeks <= 0 ? 4 : Math.min(weeks, 12);
+    const daysToGenerate = weeksCount * 7;
+
+    const plannedDates = [];
+    for (let offset = 0; offset < daysToGenerate; offset += 1) {
+      const candidate = new Date(today);
+      candidate.setDate(today.getDate() + offset);
+      if (selectedDays.includes(candidate.getDay())) {
+        plannedDates.push(formatDateValue(candidate));
       }
     }
 
-    const plannedDates = [...selectedDatesSet]
-      .map((dateString) => dateString)
-      .filter((dateString) => {
-        const parsed = new Date(dateString);
-        return !Number.isNaN(parsed.getTime()) && parsed >= today;
-      })
-      .sort();
-
     if (!plannedDates.length) {
-      setAvailabilityFeedback({ type: 'error', message: 'Select at least one day or custom date.' });
+      setAvailabilityFeedback({ type: 'error', message: 'Select at least one weekday to plan your availability.' });
       return;
     }
 
@@ -410,9 +373,10 @@ function StaffPortal() {
       const totalUpdated = slotsToCreate.length + slotsToRestore.length;
       setAvailabilityFeedback({
         type: 'success',
-        message: `Availability updated for ${totalUpdated} slot${totalUpdated === 1 ? '' : 's'}.`,
+        message: `Availability updated for ${totalUpdated} slot${totalUpdated === 1 ? '' : 's'} covering the next ${weeksCount} week${
+          weeksCount === 1 ? '' : 's'
+        }.`,
       });
-      setAvailabilityPlanner((prev) => ({ ...prev, customDates: [], customDateInput: '' }));
       await loadAvailability();
     } catch (err) {
       setAvailabilityFeedback({ type: 'error', message: err.message || 'Failed to update availability.' });
@@ -534,6 +498,7 @@ function StaffPortal() {
       formData.append('email', profileForm.email);
       formData.append('phoneNumber', profileForm.phoneNumber);
       formData.append('specialization', profileForm.specialization || '');
+      formData.append('consultationFee', profileForm.consultationFee || '0');
       if (profileForm.avatarFile) {
         formData.append('avatar', profileForm.avatarFile);
       }
@@ -708,9 +673,6 @@ function StaffPortal() {
               onClearDays={handleClearDays}
               onPlannerFieldChange={handlePlannerFieldChange}
               onCustomTimeToggle={handleCustomTimeToggle}
-              onCustomDateChange={handleCustomDateInputChange}
-              onAddCustomDate={handleAddCustomDate}
-              onRemoveCustomDate={handleRemoveCustomDate}
               onSubmit={handleAvailabilitySubmit}
               startTimeOptions={startTimeOptions}
               endTimeOptions={endTimeOptions}
