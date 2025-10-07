@@ -7,7 +7,12 @@ CREATE TABLE IF NOT EXISTS doctors (
     DoctorID INT AUTO_INCREMENT PRIMARY KEY,
     FullName VARCHAR(255) NOT NULL,
     MaxPatientNumber INT NOT NULL,
-    CurrentPatientNumber INT NOT NULL DEFAULT 0
+    CurrentPatientNumber INT NOT NULL DEFAULT 0,
+    Email VARCHAR(255) NULL,
+    PhoneNumber VARCHAR(50) NULL,
+    Specialization VARCHAR(255) NULL,
+    AvatarUrl TEXT NULL,
+    ConsultationFee DECIMAL(10,2) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB;
 
 -- ---------------------------
@@ -69,6 +74,7 @@ CREATE TABLE IF NOT EXISTS available_time (
     StartTime TIME NOT NULL,
     EndTime TIME NOT NULL,
     IsAvailable TINYINT(1) NOT NULL DEFAULT 1,
+    DayOfWeek TINYINT NOT NULL DEFAULT 0,
     FOREIGN KEY (DoctorID) REFERENCES doctors(DoctorID)
         ON UPDATE CASCADE
         ON DELETE CASCADE
@@ -94,7 +100,24 @@ CREATE TABLE IF NOT EXISTS appointments (
 ) ENGINE=InnoDB;
 
 -- ---------------------------
--- 7. Create the site_content table
+-- 7. Create the payments table
+-- ---------------------------
+CREATE TABLE IF NOT EXISTS payments (
+    PaymentID INT AUTO_INCREMENT PRIMARY KEY,
+    AppointmentID INT NOT NULL,
+    Amount DECIMAL(10,2) NOT NULL,
+    Currency VARCHAR(10) NOT NULL DEFAULT 'BDT',
+    Method ENUM('bkash', 'nagad', 'card') NOT NULL,
+    Status ENUM('paid', 'refunded', 'failed') NOT NULL DEFAULT 'paid',
+    TransactionReference VARCHAR(191) NULL,
+    PaidAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (AppointmentID) REFERENCES appointments(AppointmentID)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ---------------------------
+-- 8. Create the site_content table
 -- ---------------------------
 CREATE TABLE IF NOT EXISTS site_content (
     ContentKey VARCHAR(100) PRIMARY KEY,
@@ -103,7 +126,7 @@ CREATE TABLE IF NOT EXISTS site_content (
 ) ENGINE=InnoDB;
 
 -- ---------------------------
--- 8. Create the service_packages table
+-- 9. Create the service_packages table
 -- ---------------------------
 CREATE TABLE IF NOT EXISTS service_packages (
     PackageID INT AUTO_INCREMENT PRIMARY KEY,
@@ -117,7 +140,7 @@ CREATE TABLE IF NOT EXISTS service_packages (
 ) ENGINE=InnoDB;
 
 -- ---------------------------
--- 9. Create the service_package_items table
+-- 10. Create the service_package_items table
 -- ---------------------------
 CREATE TABLE IF NOT EXISTS service_package_items (
     PackageItemID INT AUTO_INCREMENT PRIMARY KEY,
@@ -133,7 +156,7 @@ CREATE TABLE IF NOT EXISTS service_package_items (
 ) ENGINE=InnoDB;
 
 -- ---------------------------
--- 10. Create Indexes for Performance
+-- 11. Create Indexes for Performance
 -- ---------------------------
 CREATE INDEX idx_patients_email ON patients(Email);
 CREATE INDEX idx_users_role ON users(Role);
@@ -142,7 +165,7 @@ CREATE INDEX idx_appointments_doctor_id ON appointments(DoctorID);
 CREATE INDEX idx_available_time_doctor_id ON available_time(DoctorID);
 
 -- ---------------------------
--- 11. Seed baseline reference data
+-- 12. Seed baseline reference data
 -- ---------------------------
 INSERT INTO doctors (FullName, MaxPatientNumber, CurrentPatientNumber)
 SELECT 'Dr. John Smith', 100, 0 FROM dual

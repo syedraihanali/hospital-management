@@ -67,6 +67,16 @@ async function bookAppointmentHandler(req, res) {
   }
 
   const files = req.files || [];
+  const paymentPayload = {
+    method: req.body.paymentMethod,
+    reference: req.body.paymentReference,
+    amount: req.body.paymentAmount,
+    currency: req.body.paymentCurrency,
+  };
+
+  if (!paymentPayload.method || !paymentPayload.amount) {
+    return res.status(400).json({ error: 'Payment method and amount are required to book an appointment.' });
+  }
 
   if (req.user) {
     if (req.user.role !== 'patient') {
@@ -77,6 +87,7 @@ async function bookAppointmentHandler(req, res) {
       patientId: req.user.id,
       availableTimeId: slotId,
       notes,
+      payment: paymentPayload,
     });
 
     await persistDocuments(req.user.id, appointment.appointmentId, files);
@@ -92,6 +103,7 @@ async function bookAppointmentHandler(req, res) {
         Status: 'pending',
         Notes: appointment.notes,
       },
+      payment: appointment.payment,
     });
   }
 
@@ -119,6 +131,7 @@ async function bookAppointmentHandler(req, res) {
     patientId: patient.id,
     availableTimeId: slotId,
     notes,
+    payment: paymentPayload,
   });
 
   await persistDocuments(patient.id, appointment.appointmentId, files);
@@ -153,6 +166,7 @@ async function bookAppointmentHandler(req, res) {
       Status: 'pending',
       Notes: appointment.notes,
     },
+    payment: appointment.payment,
   });
 }
 
