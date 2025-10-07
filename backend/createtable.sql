@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS doctors (
     PhoneNumber VARCHAR(50) NULL,
     Specialization VARCHAR(255) NULL,
     AvatarUrl TEXT NULL,
-    ConsultationFee DECIMAL(10,2) NOT NULL DEFAULT 0
+    ConsultationFee DECIMAL(10,2) NOT NULL DEFAULT 0,
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 -- ---------------------------
