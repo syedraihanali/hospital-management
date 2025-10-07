@@ -94,12 +94,7 @@ function ServicesPage() {
     return [...packages].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   }, [packages]);
 
-  const displayedPackages = useMemo(() => {
-    if (!sortedPackages.length) {
-      return [];
-    }
-    return sortedPackages.slice(1);
-  }, [sortedPackages]);
+  const displayedPackages = sortedPackages;
 
   if (loading) {
     return (
@@ -131,7 +126,8 @@ function ServicesPage() {
             <p className="text-base text-slate-600 sm:text-lg">
               From essential checkups to advanced diagnostics, each package blends laboratory tests, imaging, and consultations
               so you can take proactive steps toward long-term wellness. Pay only for the lab investigations you need and see
-              how bundled packages lower the final bill instantly.
+              how bundled packages lower the final bill instantly—with every test result delivered straight to your digital
+              records.
             </p>
             <div className="grid gap-4 rounded-2xl border border-brand-primary/20 bg-brand-primary/10 p-5 text-sm text-brand-dark sm:grid-cols-2">
               <div>
@@ -165,9 +161,11 @@ function ServicesPage() {
 
       <section className="space-y-6">
         <div className="text-center">
-          <h2 className="text-3xl font-semibold text-slate-900 sm:text-4xl">Choose a screening bundle that fits you</h2>
+          <h2 className="text-3xl font-semibold text-slate-900 sm:text-4xl">Choose a lab test bundle that fits you</h2>
           <p className="mt-2 text-sm text-slate-600 sm:text-base">
-            Transparent pricing with bundled diagnostics and consultations—saving you time and {siteName} money.
+            Transparent pricing with bundled diagnostics and consultations—saving you time and {siteName} money. Every bundle
+            below is curated for laboratory services, so you can complete investigations and receive coordinated follow-up in
+            one visit.
           </p>
         </div>
 
@@ -209,6 +207,11 @@ function ServicesPage() {
                       <span className="font-semibold text-brand-primary">{formatCurrency(item.price)}</span>
                     </li>
                   ))}
+                  {!packageItems.length ? (
+                    <li className="rounded-2xl border border-dashed border-brand-primary/40 bg-brand-primary/10 px-4 py-3 text-sm text-brand-primary">
+                      Detailed lab investigations for this package will be published soon.
+                    </li>
+                  ) : null}
                 </ul>
 
                 <div className="mt-8 space-y-3 rounded-2xl bg-slate-50 px-5 py-4 text-sm">
@@ -246,6 +249,15 @@ function ServicesPage() {
             </div>
           ) : null}
         </div>
+      </section>
+
+      <section className="rounded-3xl border border-brand-primary/20 bg-brand-primary/5 p-8 text-center text-slate-700 shadow-card">
+        <h3 className="text-2xl font-semibold text-brand-primary">Digital lab reports delivered to you</h3>
+        <p className="mt-3 text-sm sm:text-base">
+          After you purchase a lab test package, our admin team securely uploads the completed reports. Patients can download
+          every result from the Get Report section as well as their personal dashboard—making follow-up consultations simple
+          and paperless.
+        </p>
       </section>
 
       <section className="space-y-6">
