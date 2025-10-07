@@ -156,6 +156,28 @@ CREATE TABLE IF NOT EXISTS service_package_items (
 ) ENGINE=InnoDB;
 
 -- ---------------------------
+-- 10. Create the package_orders table to track lab package purchases
+-- ---------------------------
+CREATE TABLE IF NOT EXISTS package_orders (
+    PackageOrderID INT AUTO_INCREMENT PRIMARY KEY,
+    PackageID INT NOT NULL,
+    FullName VARCHAR(255) NOT NULL,
+    Email VARCHAR(255) NOT NULL,
+    PhoneNumber VARCHAR(50) NOT NULL,
+    NidNumber VARCHAR(100) NULL,
+    Notes TEXT NULL,
+    OriginalPrice DECIMAL(10,2) NOT NULL DEFAULT 0,
+    DiscountedPrice DECIMAL(10,2) NOT NULL DEFAULT 0,
+    Savings DECIMAL(10,2) NOT NULL DEFAULT 0,
+    Status ENUM('pending', 'confirmed', 'cancelled') NOT NULL DEFAULT 'pending',
+    PackageSnapshot LONGTEXT NULL,
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (PackageID) REFERENCES service_packages(PackageID)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ---------------------------
 -- 11. Create Indexes for Performance
 -- ---------------------------
 CREATE INDEX idx_patients_email ON patients(Email);

@@ -16,6 +16,14 @@ function normalizeStrings(value) {
   return typeof value === 'string' ? value : '';
 }
 
+function trimString(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeEmail(value) {
+  return trimString(value).toLowerCase();
+}
+
 const defaultSiteSettings = {
   siteName: 'Destination Health',
   siteTagline: 'Seamless booking, coordinated care teams, and secure records—designed for modern health journeys.',
@@ -451,6 +459,97 @@ async function deleteServicePackage(packageId) {
   }
 }
 
+async function createServicePackageOrder(packageId, payload = {}) {
+  const servicePackage = await getServicePackageById(packageId);
+
+  if (!servicePackage) {
+    const error = new Error('Service package not found.');
+    error.status = 404;
+    throw error;
+  }
+
+  const sanitized = {
+    fullName: trimString(payload.fullName),
+    email: normalizeEmail(payload.email),
+    phoneNumber: trimString(payload.phoneNumber || payload.phone),
+    nidNumber: trimString(payload.nidNumber || payload.nid),
+    notes: trimString(payload.notes),
+  };
+
+  if (!sanitized.fullName) {
+    const error = new Error('Full name is required.');
+    error.status = 400;
+    throw error;
+  }
+
+  if (!sanitized.email) {
+    const error = new Error('A valid email is required.');
+    error.status = 400;
+    throw error;
+  }
+
+  if (!sanitized.phoneNumber) {
+    const error = new Error('A valid phone number is required.');
+    error.status = 400;
+    throw error;
+  }
+
+  const originalPrice =
+    Number.parseFloat(servicePackage.totalPrice ?? servicePackage.originalPrice ?? 0) || 0;
+  const discountedPrice = Number.parseFloat(servicePackage.discountedPrice ?? 0) || 0;
+  const savings = Number.parseFloat((originalPrice - discountedPrice).toFixed(2));
+
+  const snapshot = JSON.stringify({
+    id: servicePackage.id,
+    name: servicePackage.name,
+    subtitle: servicePackage.subtitle,
+    items: servicePackage.items,
+    originalPrice,
+    discountedPrice,
+    savings,
+  });
+
+  const result = await execute(
+    `INSERT INTO package_orders
+      (PackageID, FullName, Email, PhoneNumber, NidNumber, Notes, OriginalPrice, DiscountedPrice, Savings, Status, PackageSnapshot)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+    [
+      servicePackage.id,
+      sanitized.fullName,
+      sanitized.email,
+      sanitized.phoneNumber,
+      sanitized.nidNumber || null,
+      sanitized.notes || null,
+      originalPrice,
+      discountedPrice,
+      savings,
+      snapshot,
+    ]
+  );
+
+  const orderId = result.insertId;
+
+  return {
+    message: 'Package purchase request submitted successfully.',
+    orderId,
+    status: 'pending',
+    package: {
+      id: servicePackage.id,
+      name: servicePackage.name,
+      discountedPrice,
+      originalPrice,
+      savings,
+    },
+    purchaser: {
+      fullName: sanitized.fullName,
+      email: sanitized.email,
+      phoneNumber: sanitized.phoneNumber,
+      nidNumber: sanitized.nidNumber,
+      notes: sanitized.notes,
+    },
+  };
+}
+
 module.exports = {
   getAboutContent,
   updateAboutContent,
@@ -464,4 +563,5 @@ module.exports = {
   createServicePackage,
   updateServicePackage,
   deleteServicePackage,
+  createServicePackageOrder,
 };
