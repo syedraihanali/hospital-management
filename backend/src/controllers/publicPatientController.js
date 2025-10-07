@@ -2,7 +2,6 @@ const {
   findPatientByNid,
   listPatientDocuments,
   listPatientReports,
-  listPatientLabReports,
 } = require('../services/patientService');
 const { listAppointmentsForPatient } = require('../services/appointmentService');
 
@@ -32,15 +31,11 @@ async function getAppointmentsByNid(req, res) {
     return res.status(404).json({ message: 'No patient found for the provided NID number.' });
   }
 
-  const [appointments, labReports] = await Promise.all([
-    listAppointmentsForPatient(patient.PatientID),
-    listPatientLabReports(patient.PatientID, { sort: 'desc' }),
-  ]);
+  const appointments = await listAppointmentsForPatient(patient.PatientID);
 
   return res.json({
     patient: formatPatientSummary(patient),
     appointments,
-    labReports,
   });
 }
 
@@ -56,10 +51,9 @@ async function getMedicalHistoryByNid(req, res) {
     return res.status(404).json({ message: 'No patient found for the provided NID number.' });
   }
 
-  const [documents, doctorReports, labReports] = await Promise.all([
+  const [documents, doctorReports] = await Promise.all([
     listPatientDocuments(patient.PatientID, { sort: 'desc' }),
     listPatientReports(patient.PatientID, { sort: 'desc' }),
-    listPatientLabReports(patient.PatientID, { sort: 'desc' }),
   ]);
 
   const prescriptions = documents.filter((doc) => /prescription/i.test(doc.DocumentName || ''));
@@ -70,7 +64,6 @@ async function getMedicalHistoryByNid(req, res) {
     documents: otherDocuments,
     prescriptions,
     doctorReports,
-    labReports,
   });
 }
 
@@ -102,10 +95,9 @@ async function getAppointmentAssetsByNid(req, res) {
       .json({ message: 'No appointment was found for this patient using the provided identifier.' });
   }
 
-  const [documents, doctorReports, labReports] = await Promise.all([
+  const [documents, doctorReports] = await Promise.all([
     listPatientDocuments(patient.PatientID, { sort: 'desc', appointmentId }),
     listPatientReports(patient.PatientID, { sort: 'desc', appointmentId }),
-    listPatientLabReports(patient.PatientID, { sort: 'desc' }),
   ]);
 
   return res.json({
@@ -113,7 +105,6 @@ async function getAppointmentAssetsByNid(req, res) {
     appointment,
     documents,
     doctorReports,
-    labReports,
   });
 }
 

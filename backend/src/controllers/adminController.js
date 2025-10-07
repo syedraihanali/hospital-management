@@ -9,10 +9,6 @@ const {
   reviewDoctorApplication,
   createDoctorFromApplication,
 } = require('../services/doctorService');
-const { findPatientById } = require('../services/patientService');
-const { createLabReport } = require('../services/reportService');
-const { getServicePackageById } = require('../services/contentService');
-const { storeFile } = require('../services/storageService');
 
 async function getOverview(_req, res) {
   const overview = await getOverviewMetrics();
@@ -78,76 +74,6 @@ async function getDoctorAppointmentsForAdminHandler(req, res) {
   return res.json(appointments);
 }
 
-async function sendLabReportToPatient(req, res) {
-  const patientId = Number.parseInt(req.params.id, 10);
-  if (Number.isNaN(patientId)) {
-    return res.status(400).json({ message: 'Invalid patient identifier.' });
-  }
-
-  const patient = await findPatientById(patientId);
-  if (!patient) {
-    return res.status(404).json({ message: 'Patient not found.' });
-  }
-
-  const { title, description = '', testName = '', baseCharge, packageId: rawPackageId } = req.body;
-
-  if (!title) {
-    return res.status(400).json({ message: 'Report title is required.' });
-  }
-
-  const baseChargeValue = Number.parseFloat(baseCharge);
-  if (!Number.isFinite(baseChargeValue) || baseChargeValue <= 0) {
-    return res.status(400).json({ message: 'A valid base charge is required for the lab report.' });
-  }
-
-  let normalizedPackageId = null;
-  let discountRate = 0;
-
-  if (rawPackageId) {
-    const parsedPackageId = Number.parseInt(rawPackageId, 10);
-    if (!Number.isNaN(parsedPackageId)) {
-      const servicePackage = await getServicePackageById(parsedPackageId);
-      if (!servicePackage) {
-        return res.status(400).json({ message: 'Selected package could not be found.' });
-      }
-      normalizedPackageId = servicePackage.id;
-      const packageValue = Number.parseFloat(servicePackage.totalPrice ?? servicePackage.originalPrice ?? 0) || 0;
-      const packageDiscounted = Number.parseFloat(servicePackage.discountedPrice ?? 0) || 0;
-      discountRate = packageValue > 0 ? Math.max(0, Math.min(1, 1 - packageDiscounted / packageValue)) : 0;
-    }
-  }
-
-  const discountAmount = Number.parseFloat((baseChargeValue * discountRate).toFixed(2));
-  const finalCharge = Number.parseFloat((baseChargeValue - discountAmount).toFixed(2));
-
-  const reportFile = req.file;
-  if (!reportFile) {
-    return res.status(400).json({ message: 'A lab report file is required.' });
-  }
-
-  const fileUrl = await storeFile(reportFile, 'lab-reports');
-
-  await createLabReport({
-    patientId,
-    adminId: req.user.id,
-    title,
-    description,
-    fileUrl,
-    testName,
-    packageId: normalizedPackageId,
-    baseCharge: baseChargeValue,
-    discountAmount,
-    finalCharge,
-  });
-
-  return res.status(201).json({
-    message: 'Lab report shared with the patient.',
-    fileUrl,
-    discountAmount,
-    finalCharge,
-  });
-}
-
 module.exports = {
   getOverview,
   getDoctorApplications,
@@ -155,5 +81,4 @@ module.exports = {
   searchDoctorsDirectoryHandler,
   getDoctorDirectoryProfile,
   getDoctorAppointmentsForAdminHandler,
-  sendLabReportToPatient,
 };
