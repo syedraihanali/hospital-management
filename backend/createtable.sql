@@ -1,8 +1,4 @@
--- MySQL schema and seed script for Destination Health
 
--- ---------------------------
--- 1. Create the doctors table
--- ---------------------------
 CREATE TABLE IF NOT EXISTS doctors (
     DoctorID INT AUTO_INCREMENT PRIMARY KEY,
     FullName VARCHAR(255) NOT NULL,
@@ -16,9 +12,6 @@ CREATE TABLE IF NOT EXISTS doctors (
     CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- ---------------------------
--- 2. Create the patients table
--- ---------------------------
 CREATE TABLE IF NOT EXISTS patients (
     PatientID INT AUTO_INCREMENT PRIMARY KEY,
     FullName VARCHAR(255) NOT NULL,
@@ -34,17 +27,11 @@ CREATE TABLE IF NOT EXISTS patients (
         ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- ---------------------------
--- 3. Create the admins table
--- ---------------------------
 CREATE TABLE IF NOT EXISTS admins (
     AdminID INT AUTO_INCREMENT PRIMARY KEY,
     FullName VARCHAR(255) NOT NULL
 ) ENGINE=InnoDB;
 
--- ---------------------------
--- 4. Create the users table
--- ---------------------------
 CREATE TABLE IF NOT EXISTS users (
     UserID INT AUTO_INCREMENT PRIMARY KEY,
     Email VARCHAR(255) NOT NULL UNIQUE,
@@ -65,9 +52,6 @@ CREATE TABLE IF NOT EXISTS users (
     )
 ) ENGINE=InnoDB;
 
--- ---------------------------
--- 5. Create the available_time table
--- ---------------------------
 CREATE TABLE IF NOT EXISTS available_time (
     AvailableTimeID INT AUTO_INCREMENT PRIMARY KEY,
     DoctorID INT NOT NULL,
@@ -81,9 +65,6 @@ CREATE TABLE IF NOT EXISTS available_time (
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- ---------------------------
--- 6. Create the appointments table
--- ---------------------------
 CREATE TABLE IF NOT EXISTS appointments (
     AppointmentID INT AUTO_INCREMENT PRIMARY KEY,
     PatientID INT NOT NULL,
@@ -100,9 +81,6 @@ CREATE TABLE IF NOT EXISTS appointments (
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- ---------------------------
--- 7. Create the payments table
--- ---------------------------
 CREATE TABLE IF NOT EXISTS payments (
     PaymentID INT AUTO_INCREMENT PRIMARY KEY,
     AppointmentID INT NOT NULL,
@@ -117,18 +95,12 @@ CREATE TABLE IF NOT EXISTS payments (
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- ---------------------------
--- 8. Create the site_content table
--- ---------------------------
 CREATE TABLE IF NOT EXISTS site_content (
     ContentKey VARCHAR(100) PRIMARY KEY,
     ContentValue LONGTEXT NOT NULL,
     UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- ---------------------------
--- 9. Create the service_packages table
--- ---------------------------
 CREATE TABLE IF NOT EXISTS service_packages (
     PackageID INT AUTO_INCREMENT PRIMARY KEY,
     PackageName VARCHAR(255) NOT NULL,
@@ -140,9 +112,6 @@ CREATE TABLE IF NOT EXISTS service_packages (
     UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- ---------------------------
--- 10. Create the service_package_items table
--- ---------------------------
 CREATE TABLE IF NOT EXISTS service_package_items (
     PackageItemID INT AUTO_INCREMENT PRIMARY KEY,
     PackageID INT NOT NULL,
@@ -156,9 +125,6 @@ CREATE TABLE IF NOT EXISTS service_package_items (
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- ---------------------------
--- 10. Create the package_orders table to track lab package purchases
--- ---------------------------
 CREATE TABLE IF NOT EXISTS package_orders (
     PackageOrderID INT AUTO_INCREMENT PRIMARY KEY,
     PackageID INT NOT NULL,
@@ -178,18 +144,12 @@ CREATE TABLE IF NOT EXISTS package_orders (
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- ---------------------------
--- 11. Create Indexes for Performance
--- ---------------------------
 CREATE INDEX idx_patients_email ON patients(Email);
 CREATE INDEX idx_users_role ON users(Role);
 CREATE INDEX idx_appointments_patient_id ON appointments(PatientID);
 CREATE INDEX idx_appointments_doctor_id ON appointments(DoctorID);
 CREATE INDEX idx_available_time_doctor_id ON available_time(DoctorID);
 
--- ---------------------------
--- 12. Seed baseline reference data
--- ---------------------------
 INSERT INTO doctors (FullName, MaxPatientNumber, CurrentPatientNumber)
 SELECT 'Dr. John Smith', 100, 0 FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM doctors WHERE FullName = 'Dr. John Smith');
@@ -218,9 +178,6 @@ INSERT INTO admins (FullName)
 SELECT 'System Administrator' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM admins WHERE FullName = 'System Administrator');
 
--- ---------------------------
--- 12. Seed marketing content (about & service packages)
--- ---------------------------
 INSERT INTO site_content (ContentKey, ContentValue)
 SELECT 'about_page', JSON_OBJECT(
     'hero', JSON_OBJECT(
@@ -893,9 +850,6 @@ WHERE p.PackageName = 'Package-5'
     SELECT 1 FROM service_package_items spi WHERE spi.PackageID = p.PackageID AND spi.ItemName = 'Needle, Tube & Reg. Charges'
   );
 
--- ---------------------------
--- 13. Seed role-based authentication accounts
--- ---------------------------
 INSERT INTO users (Email, PasswordHash, Role, AdminID)
 SELECT 'admin@hospital.com', '$2a$10$D5s70fBDZ1.6vQrPYC0.AuBZGAPll7n/eI16oQ4GhWG0V6h78trKC', 'admin', a.AdminID
 FROM admins a
@@ -908,7 +862,6 @@ FROM doctors d
 WHERE d.FullName = 'Dr. John Smith'
   AND NOT EXISTS (SELECT 1 FROM users WHERE Email = 'dr.john@hospital.com');
 
--- Ensure each patient record has a corresponding user entry
 INSERT INTO users (Email, PasswordHash, Role, PatientID)
 SELECT p.Email, p.PasswordHash, 'patient', p.PatientID
 FROM patients p
@@ -916,9 +869,6 @@ WHERE NOT EXISTS (
     SELECT 1 FROM users u WHERE u.PatientID = p.PatientID
 );
 
--- ---------------------------
--- 14. Triggers to maintain doctor patient counts
--- ---------------------------
 DELIMITER //
 
 CREATE TRIGGER trg_after_patient_insert
