@@ -43,7 +43,6 @@ function Header() {
         return [
           { label: 'Home', to: '/' },
           { label: 'Book', to: '/book-appointment' },
-          { label: 'Specialists', to: '/specialists' },
           { label: 'Services', to: '/services' },
           { label: 'Get Reports', to: '/reports' },
           { label: 'About Us', to: '/about-us' },
@@ -56,7 +55,6 @@ function Header() {
         return [
           { label: 'Home', to: '/' },
           { label: 'Book', to: '/book-appointment' },
-          { label: 'Specialists', to: '/specialists' },
           { label: 'Get Reports', to: '/reports' },
           { label: 'Services', to: '/services' },
           { label: 'About Us', to: '/about-us' },

@@ -10,6 +10,7 @@ function PatientProfile() {
 
   const [profile, setProfile] = useState(null);
   const [appointmentHistory, setAppointmentHistory] = useState([]);
+  const [labReports, setLabReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [profileForm, setProfileForm] = useState(null);
@@ -55,6 +56,7 @@ function PatientProfile() {
       setAppointmentHistory(
         Array.isArray(timelineData.appointments) ? timelineData.appointments : []
       );
+      setLabReports(Array.isArray(timelineData.labReports) ? timelineData.labReports : []);
       setProfileForm({
         fullName: profileData.FullName || '',
         phoneNumber: profileData.PhoneNumber || '',
@@ -83,6 +85,7 @@ function PatientProfile() {
       }
       const data = await response.json();
       setAppointmentHistory(Array.isArray(data.appointments) ? data.appointments : []);
+      setLabReports(Array.isArray(data.labReports) ? data.labReports : []);
     } catch (err) {
       setError(err.message || 'Failed to refresh history.');
     }
@@ -134,6 +137,46 @@ function PatientProfile() {
         : b.dateValue.getTime() - a.dateValue.getTime()
     );
   }, [appointmentHistory, searchTerm, sortOrder]);
+
+  const recentLabReports = useMemo(() => {
+    return (labReports || [])
+      .map((report) => ({
+        id: report.LabReportID ?? `lab-${report.Title}`,
+        title: report.Title,
+        testName: report.TestName || '',
+        adminName: report.AdminName || 'Administrator',
+        createdAt: report.CreatedAt,
+        baseCharge: report.BaseCharge,
+        discountAmount: report.DiscountAmount,
+        finalCharge: report.FinalCharge,
+        packageName: report.PackageName || '',
+        description: report.Description || '',
+        fileUrl: report.FileUrl,
+      }))
+      .slice(0, 5);
+  }, [labReports]);
+
+  const formatCurrency = (value) => {
+    const amount = Number.parseFloat(value ?? 0) || 0;
+    return `BDT ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const formatDateTime = (value) => {
+    if (!value) {
+      return '—';
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
 
   const handleProfileInputChange = (event) => {
     const { name, value } = event.target;
@@ -453,6 +496,69 @@ function PatientProfile() {
           </div>
         </article>
       </section>
+
+      {recentLabReports.length ? (
+        <section className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card backdrop-blur">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-brand-primary">Latest lab reports</h2>
+              <p className="text-sm text-slate-600">See the most recent diagnostics shared by the admin team.</p>
+            </div>
+            <Link
+              to="/medical-history"
+              className="inline-flex items-center justify-center rounded-full border border-brand-primary px-4 py-2 text-xs font-semibold text-brand-primary transition hover:bg-brand-primary hover:text-white"
+            >
+              Browse all records
+            </Link>
+          </div>
+          <ul className="mt-6 grid gap-4">
+            {recentLabReports.map((report) => (
+              <li
+                key={report.id}
+                className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/90 px-4 py-4 text-sm text-slate-700 shadow-sm"
+              >
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{report.title}</p>
+                    <p className="text-xs text-slate-500">
+                      {report.testName ? `${report.testName} · ` : ''}
+                      Shared {formatDateTime(report.createdAt)} by {report.adminName}
+                    </p>
+                  </div>
+                  <a
+                    href={report.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center rounded-full border border-brand-primary px-4 py-2 text-xs font-semibold text-brand-primary transition hover:bg-brand-primary hover:text-white"
+                  >
+                    Download
+                  </a>
+                </div>
+                <div className="grid gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-600 sm:grid-cols-3">
+                  <div>
+                    <p className="font-semibold text-slate-700">Base charge</p>
+                    <p className="text-sm text-brand-primary">{formatCurrency(report.baseCharge)}</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-700">Discount</p>
+                    <p className="text-sm text-emerald-600">{formatCurrency(report.discountAmount)}</p>
+                    {report.packageName ? (
+                      <p className="text-[11px] text-slate-500">{report.packageName}</p>
+                    ) : null}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-700">Final payable</p>
+                    <p className="text-sm text-brand-dark">{formatCurrency(report.finalCharge)}</p>
+                  </div>
+                </div>
+                {report.description ? (
+                  <p className="text-xs text-slate-600">{report.description}</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card backdrop-blur">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

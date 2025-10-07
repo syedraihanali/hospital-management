@@ -104,6 +104,33 @@ async function listPatientReports(patientId, { search = '', sort = 'desc', appoi
   );
 }
 
+async function listPatientLabReports(patientId, { search = '', sort = 'desc' } = {}) {
+  const order = sort === 'asc' ? 'ASC' : 'DESC';
+  const like = `%${search}%`;
+
+  return execute(
+    `SELECT
+        lr.LabReportID,
+        lr.Title,
+        lr.Description,
+        lr.FileUrl,
+        lr.TestName,
+        lr.BaseCharge,
+        lr.DiscountAmount,
+        lr.FinalCharge,
+        lr.PackageID,
+        lr.CreatedAt,
+        a.FullName AS AdminName,
+        sp.PackageName
+     FROM lab_reports lr
+     JOIN admins a ON lr.AdminID = a.AdminID
+     LEFT JOIN service_packages sp ON lr.PackageID = sp.PackageID
+     WHERE lr.PatientID = ? AND (lr.Title LIKE ? OR lr.Description LIKE ? OR lr.TestName LIKE ?)
+     ORDER BY lr.CreatedAt ${order}`,
+    [patientId, like, like, like]
+  );
+}
+
 async function findPatientByNid(nidNumber) {
   const patients = await execute(
     `SELECT PatientID, FullName, BirthDate, PhoneNumber, Email, Gender, Address, DoctorID, NidNumber, AvatarUrl
@@ -148,4 +175,5 @@ module.exports = {
   updatePatientProfile,
   updatePatientPassword,
   findPatientByNid,
+  listPatientLabReports,
 };
