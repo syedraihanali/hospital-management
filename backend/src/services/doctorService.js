@@ -1,7 +1,5 @@
 const bcrypt = require('bcryptjs');
 const { execute, transaction } = require('../database/query');
-
-// Retrieves all doctors from the database with their next available appointment slot.
 async function listDoctors() {
   return execute(
     `SELECT
@@ -43,14 +41,10 @@ async function listDoctors() {
       ORDER BY d.FullName ASC`
   );
 }
-
-// Finds a doctor by identifier.
 async function getDoctorById(doctorId) {
   const doctors = await execute('SELECT * FROM doctors WHERE DoctorID = ?', [doctorId]);
   return doctors[0];
 }
-
-// Increments the active patient count for a doctor.
 async function incrementDoctorPatientCount(doctorId) {
   await execute('UPDATE doctors SET CurrentPatientNumber = CurrentPatientNumber + 1 WHERE DoctorID = ?', [doctorId]);
 }

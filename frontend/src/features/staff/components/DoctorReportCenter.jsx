@@ -12,30 +12,38 @@ function DoctorReportCenter({
   feedback,
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const appointmentIdFromQuery = searchParams.get('appointmentId');
+  const searchParamsSnapshot = searchParams.toString();
 
   useEffect(() => {
-    const requestedId = searchParams.get('appointmentId');
-    if (requestedId) {
-      const parsedId = Number.parseInt(requestedId, 10);
-      if (!Number.isNaN(parsedId) && parsedId !== reportForm.appointmentId) {
-        const appointmentExists = appointments.some((appt) => appt.AppointmentID === parsedId);
-        if (appointmentExists) {
-          onSelectAppointment(parsedId);
-        }
-      }
-      const updatedParams = new URLSearchParams(searchParams);
-      updatedParams.delete('appointmentId');
-      setSearchParams(updatedParams, { replace: true });
+    if (!appointmentIdFromQuery) {
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appointments]);
+
+    const parsedId = Number.parseInt(appointmentIdFromQuery, 10);
+    if (!Number.isNaN(parsedId) && parsedId !== reportForm.appointmentId) {
+      const appointmentExists = appointments.some((appt) => appt.AppointmentID === parsedId);
+      if (appointmentExists) {
+        onSelectAppointment(parsedId);
+      }
+    }
+    const updatedParams = new URLSearchParams(searchParamsSnapshot);
+    updatedParams.delete('appointmentId');
+    setSearchParams(updatedParams, { replace: true });
+  }, [
+    appointmentIdFromQuery,
+    appointments,
+    onSelectAppointment,
+    reportForm.appointmentId,
+    searchParamsSnapshot,
+    setSearchParams,
+  ]);
 
   useEffect(() => {
     if (!reportForm.appointmentId && appointments.length) {
       onSelectAppointment(appointments[0].AppointmentID);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appointments, reportForm.appointmentId]);
+  }, [appointments, onSelectAppointment, reportForm.appointmentId]);
 
   const selectedAppointment = appointments.find(
     (appointment) => appointment.AppointmentID === reportForm.appointmentId

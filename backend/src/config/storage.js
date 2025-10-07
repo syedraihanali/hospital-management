@@ -11,7 +11,6 @@ const minioClient = new Client({
 });
 
 ensureBucketExists(minioClient, config.storage.bucket).catch((error) => {
-  // eslint-disable-next-line no-console
   console.error('Unable to verify MinIO bucket:', error.message);
 });
 

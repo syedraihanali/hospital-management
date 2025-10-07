@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../../auth/context/AuthContext';
 import { FaCalendarCheck } from 'react-icons/fa';
@@ -20,7 +20,7 @@ function PatientProfile() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOrder, setSortOrder] = useState('desc');
 
-  const fetchProfileAndTimeline = async () => {
+  const fetchProfileAndTimeline = useCallback(async () => {
     if (!patientId || !auth.token) {
       return;
     }
@@ -69,7 +69,7 @@ function PatientProfile() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiBaseUrl, auth.token, patientId]);
 
   const refreshTimeline = async () => {
     try {
@@ -90,8 +90,7 @@ function PatientProfile() {
 
   useEffect(() => {
     fetchProfileAndTimeline();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patientId]);
+  }, [fetchProfileAndTimeline]);
 
   const appointmentEntries = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();

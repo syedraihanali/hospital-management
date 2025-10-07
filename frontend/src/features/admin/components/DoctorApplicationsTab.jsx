@@ -55,15 +55,11 @@ function DoctorApplicationsTab({ token }) {
   );
 
   useEffect(() => {
-    if (status === 'idle' && token) {
-      fetchApplications(normalizedFilter);
+    if (!token) {
+      return;
     }
-  }, [fetchApplications, normalizedFilter, status, token]);
 
-  useEffect(() => {
-    if (status !== 'idle' && token) {
-      fetchApplications(normalizedFilter);
-    }
+    fetchApplications(normalizedFilter);
   }, [fetchApplications, normalizedFilter, token]);
 
   const handleReview = async (applicationId, nextStatus) => {

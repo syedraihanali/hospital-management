@@ -1,6 +1,4 @@
 const { execute, transaction } = require('../database/query');
-
-// Retrieves upcoming appointments for a patient.
 async function getUpcomingAppointments(patientId) {
   return execute(
     `SELECT
@@ -19,8 +17,6 @@ async function getUpcomingAppointments(patientId) {
     [patientId]
   );
 }
-
-// Retrieves historical appointments for a patient.
 async function getAppointmentHistory(patientId) {
   return execute(
     `SELECT
@@ -38,8 +34,6 @@ async function getAppointmentHistory(patientId) {
     [patientId]
   );
 }
-
-// Retrieves upcoming appointments for a doctor including patient details.
 async function getUpcomingAppointmentsForDoctor(doctorId) {
   return execute(
     `SELECT
@@ -58,8 +52,6 @@ async function getUpcomingAppointmentsForDoctor(doctorId) {
     [doctorId]
   );
 }
-
-// Lists available appointment slots for a specific doctor.
 async function getAvailableTimes(doctorId) {
   return execute(
     `SELECT
@@ -74,8 +66,6 @@ async function getAvailableTimes(doctorId) {
     [doctorId]
   );
 }
-
-// Books an appointment within a database transaction to avoid double booking.
 async function bookAppointment({ patientId, availableTimeId, notes = '' }) {
   return transaction(async (connection) => {
     const [timeSlots] = await connection.execute(

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 
 function DoctorDirectoryTab({ token }) {
@@ -18,92 +18,97 @@ function DoctorDirectoryTab({ token }) {
   const [detailsStatus, setDetailsStatus] = useState('idle');
   const [detailsError, setDetailsError] = useState('');
 
-  const fetchDoctors = async (query = '') => {
-    if (!token) {
-      return;
-    }
+  const fetchDoctors = useCallback(
+    async (query = '') => {
+      if (!token) {
+        return;
+      }
 
-    setDirectoryStatus('loading');
-    setDirectoryError('');
+      setDirectoryStatus('loading');
+      setDirectoryError('');
 
-    try {
-      const response = await fetch(
-        `${apiBaseUrl}/api/admin/doctors${query ? `?search=${encodeURIComponent(query)}` : ''}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+      try {
+        const response = await fetch(
+          `${apiBaseUrl}/api/admin/doctors${query ? `?search=${encodeURIComponent(query)}` : ''}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Unable to load doctor directory.');
         }
-      );
 
-      if (!response.ok) {
-        throw new Error('Unable to load doctor directory.');
+        const data = await response.json();
+        setDoctors(Array.isArray(data) ? data : []);
+        setDirectoryStatus('succeeded');
+        if (data.length && !selectedDoctorId) {
+          setSelectedDoctorId(data[0].DoctorID);
+        }
+      } catch (error) {
+        setDoctors([]);
+        setDirectoryStatus('failed');
+        setDirectoryError(error.message || 'Unable to load doctor directory.');
+      }
+    },
+    [apiBaseUrl, selectedDoctorId, token]
+  );
+
+  const fetchDoctorDetails = useCallback(
+    async (doctorId) => {
+      if (!token || !doctorId) {
+        return;
       }
 
-      const data = await response.json();
-      setDoctors(Array.isArray(data) ? data : []);
-      setDirectoryStatus('succeeded');
-      if (data.length && !selectedDoctorId) {
-        setSelectedDoctorId(data[0].DoctorID);
+      setDetailsStatus('loading');
+      setDetailsError('');
+
+      try {
+        const [profileRes, upcomingRes, historyRes] = await Promise.all([
+          fetch(`${apiBaseUrl}/api/admin/doctors/${doctorId}/profile`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${apiBaseUrl}/api/admin/doctors/${doctorId}/appointments?scope=upcoming`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${apiBaseUrl}/api/admin/doctors/${doctorId}/appointments?scope=history`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+
+        if (!profileRes.ok) {
+          throw new Error('Unable to load doctor profile.');
+        }
+        if (!upcomingRes.ok || !historyRes.ok) {
+          throw new Error('Unable to load appointment records.');
+        }
+
+        const profileData = await profileRes.json();
+        const upcomingData = await upcomingRes.json();
+        const historyData = await historyRes.json();
+
+        setSelectedDoctorProfile(profileData);
+        setUpcomingAppointments(Array.isArray(upcomingData) ? upcomingData : []);
+        setHistoryAppointments(Array.isArray(historyData) ? historyData : []);
+        setDetailsStatus('succeeded');
+      } catch (error) {
+        setDetailsStatus('failed');
+        setDetailsError(error.message || 'Unable to load doctor details.');
+        setSelectedDoctorProfile(null);
+        setUpcomingAppointments([]);
+        setHistoryAppointments([]);
       }
-    } catch (error) {
-      setDoctors([]);
-      setDirectoryStatus('failed');
-      setDirectoryError(error.message || 'Unable to load doctor directory.');
-    }
-  };
-
-  const fetchDoctorDetails = async (doctorId) => {
-    if (!token || !doctorId) {
-      return;
-    }
-
-    setDetailsStatus('loading');
-    setDetailsError('');
-
-    try {
-      const [profileRes, upcomingRes, historyRes] = await Promise.all([
-        fetch(`${apiBaseUrl}/api/admin/doctors/${doctorId}/profile`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(`${apiBaseUrl}/api/admin/doctors/${doctorId}/appointments?scope=upcoming`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(`${apiBaseUrl}/api/admin/doctors/${doctorId}/appointments?scope=history`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-      ]);
-
-      if (!profileRes.ok) {
-        throw new Error('Unable to load doctor profile.');
-      }
-      if (!upcomingRes.ok || !historyRes.ok) {
-        throw new Error('Unable to load appointment records.');
-      }
-
-      const profileData = await profileRes.json();
-      const upcomingData = await upcomingRes.json();
-      const historyData = await historyRes.json();
-
-      setSelectedDoctorProfile(profileData);
-      setUpcomingAppointments(Array.isArray(upcomingData) ? upcomingData : []);
-      setHistoryAppointments(Array.isArray(historyData) ? historyData : []);
-      setDetailsStatus('succeeded');
-    } catch (error) {
-      setDetailsStatus('failed');
-      setDetailsError(error.message || 'Unable to load doctor details.');
-      setSelectedDoctorProfile(null);
-      setUpcomingAppointments([]);
-      setHistoryAppointments([]);
-    }
-  };
+    },
+    [apiBaseUrl, token]
+  );
 
   useEffect(() => {
     if (directoryStatus === 'idle' && token) {
       fetchDoctors();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [directoryStatus, token]);
+  }, [directoryStatus, fetchDoctors, token]);
 
   useEffect(() => {
     if (selectedDoctorId) {
@@ -113,8 +118,7 @@ function DoctorDirectoryTab({ token }) {
       setUpcomingAppointments([]);
       setHistoryAppointments([]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDoctorId]);
+  }, [fetchDoctorDetails, selectedDoctorId]);
 
   const handleSearchSubmit = (event) => {
     event.preventDefault();

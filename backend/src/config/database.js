@@ -1,7 +1,6 @@
 const mysql = require('mysql2/promise');
 const config = require('./env');
 
-// Shared MySQL connection pool used across the application.
 const pool = mysql.createPool({
   host: config.database.host,
   port: config.database.port,
@@ -34,7 +33,6 @@ async function waitForAvailability(
         connection.release();
       }
       if (attempt < attempts) {
-        // eslint-disable-next-line no-console
         console.warn(
           `Database connection failed (attempt ${attempt}/${attempts}). Retrying in ${delay}ms...`,
           error.message

@@ -1,7 +1,5 @@
 const bcrypt = require('bcryptjs');
 const { execute, transaction } = require('../database/query');
-
-// Persists a new patient with a securely hashed password.
 async function createPatient({
   fullName,
   birthDate,
@@ -46,16 +44,12 @@ async function createPatient({
     return { id: patientId, userId: userResult.insertId, fullName, email };
   });
 }
-
-// Returns the full list of patients.
 async function listPatients() {
   return execute(
     `SELECT PatientID, FullName, BirthDate, PhoneNumber, Email, Gender, Address, DoctorID, NidNumber, AvatarUrl
      FROM patients`
   );
 }
-
-// Retrieves a patient by identifier.
 async function findPatientById(id) {
   const patients = await execute(
     `SELECT PatientID, FullName, BirthDate, PhoneNumber, Email, Gender, Address, DoctorID, NidNumber, AvatarUrl
@@ -64,8 +58,6 @@ async function findPatientById(id) {
   );
   return patients[0];
 }
-
-// Returns the doctor assigned to a patient, if any.
 async function getDoctorIdForPatient(patientId) {
   const patients = await execute('SELECT DoctorID FROM patients WHERE PatientID = ?', [patientId]);
   return patients[0]?.DoctorID;

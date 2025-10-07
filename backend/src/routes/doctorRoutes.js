@@ -21,7 +21,6 @@ const {
 
 const router = Router();
 
-// Doctor catalog endpoints.
 router.get('/', asyncHandler(getDoctors));
 router.post(
   '/apply',

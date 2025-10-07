@@ -1,6 +1,5 @@
 const dotenv = require('dotenv');
 
-// Load environment variables from the .env file once at application boot.
 dotenv.config();
 
 const requiredVariables = ['JWT_SECRET'];
