@@ -5,7 +5,7 @@ import { AuthContext } from '../../auth/context/AuthContext';
 
 function BookingCard() {
   const navigate = useNavigate();
-  const { auth, login } = useContext(AuthContext);
+  const { auth } = useContext(AuthContext);
   const apiBaseUrl = (process.env.REACT_APP_API_URL || '').replace(/\/$/, '');
 
   const [doctors, setDoctors] = useState([]);
@@ -16,7 +16,6 @@ function BookingCard() {
   const [selectedSlotId, setSelectedSlotId] = useState('');
   const [notes, setNotes] = useState('');
   const [availabilityStatus, setAvailabilityStatus] = useState('idle');
-  const [submissionStatus, setSubmissionStatus] = useState('idle');
   const [message, setMessage] = useState({ type: '', text: '' });
 
   useEffect(() => {
@@ -62,7 +61,15 @@ function BookingCard() {
         }
         const data = await response.json();
         setAvailableTimes(data);
-        const dates = [...new Set(data.map((slot) => slot.ScheduleDate))].sort();
+        const uniqueDateMap = new Map();
+        data.forEach((slot) => {
+          if (!uniqueDateMap.has(slot.ScheduleDate)) {
+            uniqueDateMap.set(slot.ScheduleDate, slot.DayName || '');
+          }
+        });
+        const dates = Array.from(uniqueDateMap.entries())
+          .map(([date, dayName]) => ({ date, dayName }))
+          .sort((a, b) => new Date(a.date) - new Date(b.date));
         setUniqueDates(dates);
         setAvailabilityStatus('succeeded');
       } catch (error) {
@@ -86,13 +93,30 @@ function BookingCard() {
     [availableTimes, selectedDate]
   );
 
+  const consultationFee = useMemo(() => {
+    if (!selectedDoctor || selectedDoctor.ConsultationFee === undefined || selectedDoctor.ConsultationFee === null) {
+      return 0;
+    }
+    const fee = Number.parseFloat(selectedDoctor.ConsultationFee);
+    return Number.isNaN(fee) ? 0 : fee;
+  }, [selectedDoctor]);
+
+  const formattedConsultationFee = useMemo(
+    () =>
+      consultationFee.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+    [consultationFee]
+  );
+
   const messageStyles = {
     success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
     error: 'border-rose-200 bg-rose-50 text-rose-700',
     info: 'border-sky-200 bg-sky-50 text-sky-700',
   };
 
-  const handleSubmit = async (event) => {
+  const handleSubmit = (event) => {
     event.preventDefault();
 
     if (!selectedSlotId) {
@@ -100,51 +124,14 @@ function BookingCard() {
       return;
     }
 
-    if (!auth.token) {
-      navigate('/book-appointment', {
-        state: {
-          doctorId: selectedDoctorId,
-          date: selectedDate,
-          slotId: selectedSlotId,
-          notes,
-        },
-      });
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('availableTimeID', selectedSlotId);
-    if (notes.trim()) {
-      formData.append('notes', notes.trim());
-    }
-
-    setSubmissionStatus('submitting');
-    setMessage({ type: '', text: '' });
-
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/appointments/book`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${auth.token}`,
-        },
-        body: formData,
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || data.message || 'Unable to reserve the appointment.');
-      }
-
-      if (data.token && data.user) {
-        login(data.token, data.user);
-      }
-
-      setSubmissionStatus('succeeded');
-      setMessage({ type: 'success', text: 'Appointment reserved! Redirecting to your profile…' });
-      setTimeout(() => navigate('/myprofile'), 2000);
-    } catch (error) {
-      setSubmissionStatus('failed');
-      setMessage({ type: 'error', text: error.message || 'Unable to reserve the appointment.' });
-    }
+    navigate('/book-appointment', {
+      state: {
+        doctorId: selectedDoctorId,
+        date: selectedDate,
+        slotId: selectedSlotId,
+        notes,
+      },
+    });
   };
 
   return (
@@ -191,11 +178,18 @@ function BookingCard() {
         </label>
 
         {selectedDoctor ? (
-          <p className="rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-600">
-            {selectedDoctor.Specialization
-              ? `${selectedDoctor.FullName} • ${selectedDoctor.Specialization}`
-              : `${selectedDoctor.FullName} • General consultation`}
-          </p>
+          <div className="rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-600">
+            <span className="font-semibold text-slate-700">
+              {selectedDoctor.Specialization
+                ? `${selectedDoctor.FullName} • ${selectedDoctor.Specialization}`
+                : `${selectedDoctor.FullName} • General consultation`}
+            </span>
+            <span className="mt-1 block text-[11px] text-slate-500">
+              Consultation fee:{' '}
+              <span className="font-semibold text-brand-primary">BDT {formattedConsultationFee}</span>
+            </span>
+            <span className="block text-[11px] text-slate-500">Payment is completed securely on the next step.</span>
+          </div>
         ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -214,8 +208,9 @@ function BookingCard() {
                 disabled={!uniqueDates.length}
               >
                 <option value="">-- Select --</option>
-                {uniqueDates.map((date) => (
+                {uniqueDates.map(({ date, dayName }) => (
                   <option key={date} value={date}>
+                    {dayName ? `${dayName} • ` : ''}
                     {new Date(date).toLocaleDateString('en-US', {
                       weekday: 'short',
                       month: 'short',
@@ -241,6 +236,7 @@ function BookingCard() {
                 <option value="">-- Select --</option>
                 {slotsForSelectedDate.map((slot) => (
                   <option key={slot.AvailableTimeID} value={slot.AvailableTimeID}>
+                    {slot.DayName ? `${slot.DayName} • ` : ''}
                     {slot.StartTime} - {slot.EndTime}
                   </option>
                 ))}
@@ -273,13 +269,9 @@ function BookingCard() {
         <button
           type="submit"
           className="mt-2 inline-flex items-center justify-center rounded-2xl bg-brand-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-primary/30 transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300"
-          disabled={
-            submissionStatus === 'submitting' ||
-            availabilityStatus === 'loading' ||
-            !selectedSlotId
-          }
+          disabled={availabilityStatus === 'loading' || !selectedSlotId}
         >
-          {submissionStatus === 'submitting' ? 'Reserving…' : auth.token ? 'Reserve now' : 'Continue to book'}
+          {auth.token ? 'Proceed to checkout' : 'Continue to booking'}
         </button>
       </form>
     </div>

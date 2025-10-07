@@ -9,6 +9,7 @@ async function ensureSchema() {
   await createUsersTable();
   await createAvailabilityTable();
   await createAppointmentsTable();
+  await createPaymentsTable();
   await createDoctorApplicationsTable();
   await createPatientDocumentsTable();
   await createDoctorReportsTable();
@@ -38,6 +39,60 @@ async function addColumnIfMissing(table, column, definition) {
   }
 }
 
+function formatDateValue(date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatTimeValue(hour) {
+  return `${`${hour}`.padStart(2, '0')}:00:00`;
+}
+
+async function ensureDefaultAvailabilityForDoctor(doctorId, { days = 7, startHour = 9, endHour = 17 } = {}) {
+  if (!doctorId || endHour <= startHour || days <= 0) {
+    return;
+  }
+
+  const [existing] = await execute(
+    `SELECT COUNT(*) AS count FROM available_time WHERE DoctorID = ? AND ScheduleDate >= CURDATE()`,
+    [doctorId]
+  );
+
+  if (existing?.count > 0) {
+    return;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const slots = [];
+
+  for (let offset = 0; offset < days; offset += 1) {
+    const current = new Date(today);
+    current.setDate(today.getDate() + offset);
+    const scheduleDate = formatDateValue(current);
+    const dayOfWeek = current.getDay();
+
+    for (let hour = startHour; hour < endHour; hour += 1) {
+      const startTime = formatTimeValue(hour);
+      const endTime = formatTimeValue(hour + 1);
+      slots.push([doctorId, scheduleDate, dayOfWeek, startTime, endTime]);
+    }
+  }
+
+  if (!slots.length) {
+    return;
+  }
+
+  await execute(
+    `INSERT INTO available_time (DoctorID, ScheduleDate, DayOfWeek, StartTime, EndTime, IsAvailable)
+     VALUES ${slots.map(() => '(?, ?, ?, ?, ?, 1)').join(', ')}`,
+    slots.flat()
+  );
+}
+
 async function createDoctorsTable() {
   await execute(
     `CREATE TABLE IF NOT EXISTS doctors (
@@ -48,7 +103,8 @@ async function createDoctorsTable() {
       Email VARCHAR(255) NULL,
       PhoneNumber VARCHAR(50) NULL,
       Specialization VARCHAR(255) NULL,
-      AvatarUrl TEXT NULL
+      AvatarUrl TEXT NULL,
+      ConsultationFee DECIMAL(10, 2) NOT NULL DEFAULT 0
     )`
   );
 
@@ -56,6 +112,7 @@ async function createDoctorsTable() {
   await addColumnIfMissing('doctors', 'PhoneNumber', 'VARCHAR(50) NULL');
   await addColumnIfMissing('doctors', 'Specialization', 'VARCHAR(255) NULL');
   await addColumnIfMissing('doctors', 'AvatarUrl', 'TEXT NULL');
+  await addColumnIfMissing('doctors', 'ConsultationFee', 'DECIMAL(10, 2) NOT NULL DEFAULT 0');
 }
 
 async function createPatientsTable() {
@@ -124,11 +181,15 @@ async function createAvailabilityTable() {
       StartTime TIME NOT NULL,
       EndTime TIME NOT NULL,
       IsAvailable TINYINT(1) NOT NULL DEFAULT 1,
+      DayOfWeek TINYINT NOT NULL DEFAULT 0,
       FOREIGN KEY (DoctorID) REFERENCES doctors(DoctorID)
         ON UPDATE CASCADE
         ON DELETE CASCADE
     )`
   );
+
+  await addColumnIfMissing('available_time', 'DayOfWeek', 'TINYINT NOT NULL DEFAULT 0');
+  await execute('UPDATE available_time SET DayOfWeek = DAYOFWEEK(ScheduleDate) - 1 WHERE DayOfWeek IS NULL OR DayOfWeek NOT BETWEEN 0 AND 6');
 }
 
 async function createAppointmentsTable() {
@@ -162,6 +223,33 @@ async function createAppointmentsTable() {
     'UpdatedAt',
     'DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'
   );
+}
+
+async function createPaymentsTable() {
+  await execute(
+    `CREATE TABLE IF NOT EXISTS payments (
+      PaymentID INT PRIMARY KEY AUTO_INCREMENT,
+      AppointmentID INT NOT NULL,
+      Amount DECIMAL(10, 2) NOT NULL,
+      Currency VARCHAR(10) NOT NULL DEFAULT 'BDT',
+      Method ENUM('bkash', 'nagad', 'card') NOT NULL,
+      Status ENUM('paid', 'refunded', 'failed') NOT NULL DEFAULT 'paid',
+      TransactionReference VARCHAR(191) NULL,
+      PaidAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (AppointmentID) REFERENCES appointments(AppointmentID)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+    )`
+  );
+
+  await addColumnIfMissing('payments', 'Currency', "VARCHAR(10) NOT NULL DEFAULT 'BDT'");
+  await addColumnIfMissing('payments', 'TransactionReference', 'VARCHAR(191) NULL');
+  await addColumnIfMissing(
+    'payments',
+    'Status',
+    "ENUM('paid','refunded','failed') NOT NULL DEFAULT 'paid'"
+  );
+  await addColumnIfMissing('payments', 'PaidAt', 'DATETIME DEFAULT CURRENT_TIMESTAMP');
 }
 
 async function createDoctorApplicationsTable() {
@@ -319,6 +407,7 @@ async function seedDoctors() {
       email: 'dr.john@hospital.com',
       phone: '+8801711000001',
       specialization: 'Cardiology',
+      fee: 1500,
     },
     {
       name: 'Dr. Emily Davis',
@@ -326,6 +415,7 @@ async function seedDoctors() {
       email: 'dr.emily@hospital.com',
       phone: '+8801711000002',
       specialization: 'Neurology',
+      fee: 1800,
     },
     {
       name: 'Dr. Michael Brown',
@@ -333,6 +423,7 @@ async function seedDoctors() {
       email: 'dr.michael@hospital.com',
       phone: '+8801711000003',
       specialization: 'Orthopedics',
+      fee: 1400,
     },
     {
       name: 'Dr. Aisha Rahman',
@@ -340,6 +431,7 @@ async function seedDoctors() {
       email: 'dr.aisha@hospital.com',
       phone: '+8801711000004',
       specialization: 'General Medicine',
+      fee: 1200,
     },
     {
       name: 'Dr. Farid Ahmed',
@@ -347,6 +439,7 @@ async function seedDoctors() {
       email: 'dr.farid@hospital.com',
       phone: '+8801711000005',
       specialization: 'Dermatology',
+      fee: 1600,
     },
     {
       name: 'Dr. Laila Chowdhury',
@@ -354,17 +447,23 @@ async function seedDoctors() {
       email: 'dr.laila@hospital.com',
       phone: '+8801711000006',
       specialization: 'Pediatrics',
+      fee: 1100,
     },
   ];
 
   await Promise.all(
-    doctors.map(({ name, max, email, phone, specialization }) =>
+    doctors.map(({ name, max, email, phone, specialization, fee }) =>
       execute(
-        `INSERT INTO doctors (FullName, MaxPatientNumber, CurrentPatientNumber, Email, PhoneNumber, Specialization)
-         VALUES (?, ?, 0, ?, ?, ?)`,
-        [name, max, email, phone, specialization]
+        `INSERT INTO doctors (FullName, MaxPatientNumber, CurrentPatientNumber, Email, PhoneNumber, Specialization, ConsultationFee)
+         VALUES (?, ?, 0, ?, ?, ?, ?)`,
+        [name, max, email, phone, specialization, fee]
       )
     )
+  );
+
+  const seededDoctors = await execute('SELECT DoctorID FROM doctors');
+  await Promise.all(
+    seededDoctors.map((doctor) => ensureDefaultAvailabilityForDoctor(doctor.DoctorID))
   );
 }
 
@@ -784,4 +883,5 @@ async function seedLabTests() {
 
 module.exports = {
   ensureSchema,
+  ensureDefaultAvailabilityForDoctor,
 };

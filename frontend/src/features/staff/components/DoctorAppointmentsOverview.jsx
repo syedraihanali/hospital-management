@@ -69,6 +69,26 @@ function DoctorAppointmentsOverview({
             const patientDocuments = Array.isArray(appointment.PatientDocuments)
               ? appointment.PatientDocuments
               : [];
+            const paymentAmount = appointment.PaymentAmount;
+            const paymentStatus = appointment.PaymentStatus || 'paid';
+            const paymentMethod = appointment.PaymentMethod || '';
+            const paymentReference = appointment.PaymentReference || '';
+            const paymentStatusClass =
+              paymentStatus === 'paid'
+                ? 'bg-emerald-100 text-emerald-700'
+                : paymentStatus === 'refunded'
+                ? 'bg-slate-200 text-slate-600'
+                : 'bg-amber-100 text-amber-700';
+            const paymentAmountLabel =
+              typeof paymentAmount === 'number' || (typeof paymentAmount === 'string' && paymentAmount !== '')
+                ? Number(paymentAmount).toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })
+                : null;
+            const paymentMethodLabel = paymentMethod
+              ? `${paymentMethod.charAt(0).toUpperCase()}${paymentMethod.slice(1)}`
+              : 'Not recorded';
 
             const viewHistory = () => {
               if (onViewPatientHistory) {
@@ -117,9 +137,23 @@ function DoctorAppointmentsOverview({
                           </li>
                         ))}
                       </ul>
-                    ) : (
-                      <p className="mt-2 text-xs text-slate-400">No medical reports uploaded for this appointment.</p>
-                    )}
+                  ) : (
+                    <p className="mt-2 text-xs text-slate-400">No medical reports uploaded for this appointment.</p>
+                  )}
+                </div>
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2">
+                    <p className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                      Payment
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${paymentStatusClass}`}>
+                        {paymentStatus.toUpperCase()}
+                      </span>
+                    </p>
+                    <p className="mt-2 text-xs text-emerald-700">
+                      {paymentAmountLabel ? `BDT ${paymentAmountLabel}` : 'Amount pending'} • {paymentMethodLabel}
+                    </p>
+                    {paymentReference ? (
+                      <p className="text-[11px] text-emerald-600">Ref: {paymentReference}</p>
+                    ) : null}
                   </div>
                 </div>
                 <div className="flex flex-col gap-3 text-xs sm:flex-row sm:items-center">

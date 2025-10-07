@@ -42,6 +42,8 @@ function BookAppointmentPage() {
     termsAccepted: false,
   });
   const [prefillState, setPrefillState] = useState(location.state || null);
+  const [paymentMethod, setPaymentMethod] = useState('bkash');
+  const [paymentReference, setPaymentReference] = useState('');
 
   useEffect(() => {
     if (location.state) {
@@ -121,7 +123,15 @@ function BookAppointmentPage() {
         }
         const data = await response.json();
         setAvailableTimes(data);
-        const dates = [...new Set(data.map((slot) => slot.ScheduleDate))].sort();
+        const uniqueDateMap = new Map();
+        data.forEach((slot) => {
+          if (!uniqueDateMap.has(slot.ScheduleDate)) {
+            uniqueDateMap.set(slot.ScheduleDate, slot.DayName || '');
+          }
+        });
+        const dates = Array.from(uniqueDateMap.entries())
+          .map(([date, dayName]) => ({ date, dayName }))
+          .sort((a, b) => new Date(a.date) - new Date(b.date));
         setUniqueDates(dates);
         setAvailabilityStatus('succeeded');
       } catch (error) {
@@ -203,7 +213,7 @@ function BookAppointmentPage() {
     if (!prefillState?.date) {
       return;
     }
-    if (uniqueDates.includes(prefillState.date)) {
+    if (uniqueDates.some((item) => item.date === prefillState.date)) {
       setSelectedDate(prefillState.date);
     }
   }, [prefillState, uniqueDates]);
@@ -241,6 +251,33 @@ function BookAppointmentPage() {
     () => availableTimes.filter((slot) => slot.ScheduleDate === selectedDate),
     [availableTimes, selectedDate]
   );
+
+  const consultationFee = useMemo(() => {
+    if (!selectedDoctor || selectedDoctor.ConsultationFee === undefined || selectedDoctor.ConsultationFee === null) {
+      return 0;
+    }
+    const fee = Number.parseFloat(selectedDoctor.ConsultationFee);
+    return Number.isNaN(fee) ? 0 : fee;
+  }, [selectedDoctor]);
+
+  const formattedConsultationFee = useMemo(
+    () =>
+      consultationFee.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+    [consultationFee]
+  );
+
+  const paymentReferencePlaceholder = useMemo(() => {
+    if (paymentMethod === 'card') {
+      return 'Card reference or last 4 digits (optional)';
+    }
+    if (paymentMethod === 'nagad') {
+      return 'Nagad transaction ID';
+    }
+    return 'bKash transaction ID';
+  }, [paymentMethod]);
 
   const phonePattern = /^(\+?88)?01[3-9]\d{8}$/;
 
@@ -293,6 +330,11 @@ function BookAppointmentPage() {
     setSelectedSlotId(event.target.value);
   };
 
+  const handlePaymentMethodChange = (event) => {
+    setPaymentMethod(event.target.value);
+    setPaymentReference('');
+  };
+
   const handleRegistrationChange = (event) => {
     const { name, value, type, checked } = event.target;
     setRegistrationData((prev) => ({
@@ -320,6 +362,29 @@ function BookAppointmentPage() {
       return;
     }
 
+    const normalizedPaymentMethod = paymentMethod.trim().toLowerCase();
+    if (!normalizedPaymentMethod) {
+      setMessage({ type: 'error', text: 'Choose a payment method to continue.' });
+      return;
+    }
+
+    const paymentAmountValue = consultationFee;
+    const paymentAmountString = paymentAmountValue.toFixed(2);
+    const trimmedReference = paymentReference.trim();
+
+    if (['bkash', 'nagad'].includes(normalizedPaymentMethod) && !trimmedReference) {
+      setMessage({ type: 'error', text: 'Enter the mobile wallet transaction ID to confirm your payment.' });
+      return;
+    }
+
+    if (normalizedPaymentMethod === 'card' && trimmedReference && trimmedReference.length < 4) {
+      setMessage({
+        type: 'error',
+        text: 'Provide the last four digits or transaction reference for your card payment.',
+      });
+      return;
+    }
+
     if (!auth.token) {
       if (!showRegistrationForm) {
         setShowRegistrationForm(true);
@@ -340,6 +405,12 @@ function BookAppointmentPage() {
     formData.append('availableTimeID', selectedSlotId);
     if (notes.trim()) {
       formData.append('notes', notes.trim());
+    }
+    formData.append('paymentMethod', normalizedPaymentMethod);
+    formData.append('paymentAmount', paymentAmountString);
+    formData.append('paymentCurrency', 'BDT');
+    if (trimmedReference) {
+      formData.append('paymentReference', trimmedReference);
     }
     documents.forEach((file) => {
       formData.append('documents', file);
@@ -386,6 +457,7 @@ function BookAppointmentPage() {
       setDocumentInputKey((prev) => prev + 1);
       setNotes('');
       setShowRegistrationForm(false);
+      setPaymentReference('');
       setTimeout(() => navigate('/myprofile'), 2200);
     } catch (error) {
       setSubmissionStatus('failed');
@@ -466,11 +538,17 @@ function BookAppointmentPage() {
                   </label>
                 </div>
                 {selectedDoctor ? (
-                  <p className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">
-                    {selectedDoctor.Specialization
-                      ? `${selectedDoctor.FullName} specialises in ${selectedDoctor.Specialization.toLowerCase()}.`
-                      : `${selectedDoctor.FullName} is accepting general consultations.`}
-                  </p>
+                  <div className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">
+                    <span className="font-semibold text-slate-700">
+                      {selectedDoctor.Specialization
+                        ? `${selectedDoctor.FullName} • ${selectedDoctor.Specialization}`
+                        : `${selectedDoctor.FullName} • General consultation`}
+                    </span>
+                    <span className="mt-1 block text-[11px] text-slate-500">
+                      Consultation fee:{' '}
+                      <span className="font-semibold text-brand-primary">BDT {formattedConsultationFee}</span>
+                    </span>
+                  </div>
                 ) : null}
               </div>
 
@@ -484,8 +562,9 @@ function BookAppointmentPage() {
                     className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent disabled:cursor-not-allowed"
                   >
                     <option value="">-- Select a date --</option>
-                    {uniqueDates.map((date) => (
+                    {uniqueDates.map(({ date, dayName }) => (
                       <option key={date} value={date}>
+                        {dayName ? `${dayName} • ` : ''}
                         {new Date(date).toLocaleDateString('en-US', {
                           weekday: 'long',
                           month: 'short',
@@ -507,11 +586,52 @@ function BookAppointmentPage() {
                     <option value="">-- Select a time --</option>
                     {slotsForSelectedDate.map((slot) => (
                       <option key={slot.AvailableTimeID} value={slot.AvailableTimeID}>
+                        {slot.DayName ? `${slot.DayName} • ` : ''}
                         {slot.StartTime} - {slot.EndTime}
                       </option>
                     ))}
                   </select>
                 </label>
+              </div>
+
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-4 text-sm text-emerald-800">
+                <h3 className="text-sm font-semibold text-emerald-900">Payment details</h3>
+                <p className="mt-1 text-xs">
+                  Consultation fee:{' '}
+                  <span className="font-semibold">BDT {formattedConsultationFee}</span>
+                </p>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <label className="flex flex-col text-xs font-semibold text-emerald-900">
+                    Payment method
+                    <select
+                      value={paymentMethod}
+                      onChange={handlePaymentMethodChange}
+                      className="mt-2 w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-emerald-900 shadow-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
+                    >
+                      <option value="bkash">bKash (Mobile Wallet)</option>
+                      <option value="nagad">Nagad (Mobile Wallet)</option>
+                      <option value="card">Debit / Credit Card</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col text-xs font-semibold text-emerald-900">
+                    Transaction reference
+                    <input
+                      type="text"
+                      value={paymentReference}
+                      onChange={(event) => setPaymentReference(event.target.value)}
+                      placeholder={paymentReferencePlaceholder}
+                      className="mt-2 w-full rounded-lg border border-emerald-200 px-3 py-2 text-sm text-emerald-900 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
+                    />
+                    <span className="mt-1 text-[11px] font-normal text-emerald-700">
+                      {paymentMethod === 'card'
+                        ? 'Optional: share the last four digits or reference number for your card payment.'
+                        : 'Required: enter the mobile wallet transaction ID to verify your payment.'}
+                    </span>
+                  </label>
+                </div>
+                <p className="mt-3 text-[11px] text-emerald-700">
+                  Payments are processed instantly. You&apos;ll receive an email confirmation once the booking is secured.
+                </p>
               </div>
 
               {availabilityStatus === 'loading' ? (
