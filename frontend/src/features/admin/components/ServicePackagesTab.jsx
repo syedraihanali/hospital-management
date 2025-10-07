@@ -263,8 +263,11 @@ function ServicePackagesTab({ token }) {
     <section className="flex flex-col gap-6 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card backdrop-blur">
       <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-brand-primary">Service packages</h2>
-          <p className="text-sm text-slate-600">Create, curate, and price bundled health check-ups for your patients.</p>
+          <h2 className="text-xl font-semibold text-brand-primary">Lab test packages</h2>
+          <p className="text-sm text-slate-600">
+            Create bundled laboratory screenings, add individual test items, and publish the discounted price patients will see
+            on the services page.
+          </p>
         </div>
         <button
           type="button"
@@ -353,7 +356,7 @@ function ServicePackagesTab({ token }) {
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-slate-700">Package items</h4>
+                  <h4 className="text-sm font-semibold text-slate-700">Lab tests in this package</h4>
                   <button
                     type="button"
                     onClick={() => handleAddPackageItem(index)}
@@ -366,7 +369,7 @@ function ServicePackagesTab({ token }) {
                   {items.map((item, itemIndex) => (
                     <div key={`${key}-item-${itemIndex}`} className="flex flex-col gap-2 rounded-xl border border-slate-200 p-3">
                       <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-                        Item name
+                        Lab test name
                         <input
                           type="text"
                           value={item.name}
@@ -375,7 +378,7 @@ function ServicePackagesTab({ token }) {
                         />
                       </label>
                       <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-                        Price (BDT)
+                        Lab test price (BDT)
                         <input
                           type="number"
                           min="0"

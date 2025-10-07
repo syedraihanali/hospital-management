@@ -4,6 +4,7 @@ const {
   getSiteSettings,
   getHomeHeroContent,
   getLabTests,
+  createServicePackageOrder,
 } = require('../services/contentService');
 
 async function fetchAboutContent(_req, res) {
@@ -31,10 +32,86 @@ async function fetchHomeHeroContent(_req, res) {
   res.json(hero);
 }
 
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function normalizePhone(value) {
+  const cleaned = String(value || '').trim();
+  return cleaned;
+}
+
+function phoneDigits(value) {
+  return (value || '').replace(/\D/g, '');
+}
+
+async function purchaseServicePackage(req, res) {
+  const packageId = Number.parseInt(req.params.id, 10);
+
+  if (Number.isNaN(packageId)) {
+    return res.status(400).json({ message: 'Invalid package identifier.' });
+  }
+
+  const {
+    fullName = '',
+    email = '',
+    phoneNumber = '',
+    phone = '',
+    nidNumber = '',
+    nid = '',
+    notes = '',
+  } = req.body || {};
+
+  const trimmedName = String(fullName).trim();
+  if (!trimmedName) {
+    return res.status(400).json({ message: 'Full name is required.' });
+  }
+
+  const trimmedEmail = String(email).trim().toLowerCase();
+  if (!trimmedEmail || !isValidEmail(trimmedEmail)) {
+    return res.status(400).json({ message: 'A valid email address is required.' });
+  }
+
+  const rawPhone = phoneNumber || phone;
+  const trimmedPhone = normalizePhone(rawPhone);
+  if (!trimmedPhone) {
+    return res.status(400).json({ message: 'A valid phone number is required.' });
+  }
+
+  if (phoneDigits(trimmedPhone).length < 6) {
+    return res.status(400).json({ message: 'Phone number must include at least six digits.' });
+  }
+
+  const trimmedNid = String(nidNumber || nid || '').trim();
+  const trimmedNotes = String(notes || '').trim();
+
+  try {
+    const order = await createServicePackageOrder(packageId, {
+      fullName: trimmedName,
+      email: trimmedEmail,
+      phoneNumber: trimmedPhone,
+      nidNumber: trimmedNid,
+      notes: trimmedNotes,
+    });
+    return res.status(201).json(order);
+  } catch (error) {
+    if (error.status === 404) {
+      return res.status(404).json({ message: error.message });
+    }
+
+    if (error.status === 400) {
+      return res.status(400).json({ message: error.message });
+    }
+
+    throw error;
+  }
+}
+
 module.exports = {
   fetchAboutContent,
   fetchServicePackages,
   fetchLabTests,
   fetchSiteSettings,
   fetchHomeHeroContent,
+  purchaseServicePackage,
 };

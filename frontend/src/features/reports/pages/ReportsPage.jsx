@@ -203,6 +203,24 @@ function ReportsPage() {
         </div>
       </section>
 
+      <section className="flex flex-col gap-3 rounded-3xl border border-brand-primary/20 bg-brand-primary/5 p-6 text-sm text-brand-primary shadow-card">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-secondary text-brand-primary">
+            <FaFlask aria-hidden="true" />
+          </span>
+          <div>
+            <h2 className="text-lg font-semibold text-brand-primary">Lab reports hub</h2>
+            <p className="text-sm text-brand-primary/80">
+              Verify your NID below to unlock downloadable lab results that administrators share directly with you.
+            </p>
+          </div>
+        </div>
+        <p className="text-xs text-brand-primary/70">
+          Once your tests are processed, they appear instantly in the Lab Reports section with pricing, applied package discounts,
+          and secure download links.
+        </p>
+      </section>
+
       {patient ? (
         <section className="space-y-8">
           <div className="flex flex-col justify-between gap-4 rounded-3xl border border-emerald-100 bg-white/95 p-6 shadow-card sm:flex-row sm:items-center">
@@ -402,17 +420,17 @@ function ReportsPage() {
             </div>
           ) : null}
 
-          {labReports.length ? (
-            <article className="space-y-4 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card">
-              <header className="flex items-center gap-3">
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                  <FaFlask aria-hidden="true" />
-                </span>
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Lab reports shared by admin</h3>
-                  <p className="text-sm text-slate-600">Track diagnostic files, applied package discounts, and final charges.</p>
-                </div>
-              </header>
+          <article className="space-y-4 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card">
+            <header className="flex items-center gap-3">
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                <FaFlask aria-hidden="true" />
+              </span>
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Lab reports shared by admin</h3>
+                <p className="text-sm text-slate-600">Track diagnostic files, applied package discounts, and final charges.</p>
+              </div>
+            </header>
+            {labReports.length ? (
               <ul className="grid gap-3">
                 {labReports.map((report) => (
                   <li
@@ -459,8 +477,13 @@ function ReportsPage() {
                   </li>
                 ))}
               </ul>
-            </article>
-          ) : null}
+            ) : (
+              <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-4 text-sm text-slate-500">
+                Lab reports will appear here once our administrators share them for this NID. Check back after your tests are
+                processed.
+              </p>
+            )}
+          </article>
 
           <div className="rounded-3xl border border-emerald-100 bg-emerald-50/80 p-6 text-sm text-emerald-700">
             <p className="flex items-center gap-2 font-semibold">
