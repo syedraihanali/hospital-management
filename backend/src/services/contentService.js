@@ -264,46 +264,6 @@ async function getServicePackages() {
   });
 }
 
-async function getLabTests() {
-  const rows = await execute(
-    `SELECT
-        lt.LabTestID,
-        lt.TestName,
-        lt.Description,
-        lt.BasePrice,
-        lt.PackageID,
-        lt.SortOrder,
-        sp.PackageName,
-        sp.OriginalPrice,
-        sp.DiscountedPrice
-     FROM lab_tests lt
-     LEFT JOIN service_packages sp ON lt.PackageID = sp.PackageID
-     ORDER BY lt.SortOrder ASC, lt.LabTestID ASC`
-  );
-
-  return rows.map((row) => {
-    const basePrice = Number.parseFloat(row.BasePrice) || 0;
-    const packageValue = Number.parseFloat(row.OriginalPrice ?? 0) || 0;
-    const packageDiscounted = Number.parseFloat(row.DiscountedPrice ?? 0) || 0;
-    const discountRate = packageValue > 0 ? Math.max(0, Math.min(1, 1 - packageDiscounted / packageValue)) : 0;
-    const discountAmount = Number.parseFloat((basePrice * discountRate).toFixed(2));
-    const finalPrice = Number.parseFloat((basePrice - discountAmount).toFixed(2));
-
-    return {
-      id: row.LabTestID,
-      name: row.TestName,
-      description: row.Description || '',
-      basePrice,
-      packageId: row.PackageID,
-      packageName: row.PackageName || '',
-      discountRate,
-      discountAmount,
-      finalPrice,
-      sortOrder: row.SortOrder,
-    };
-  });
-}
-
 async function getServicePackageById(packageId) {
   const packages = await execute(
     `SELECT PackageID, PackageName, Subtitle, OriginalPrice, DiscountedPrice, SortOrder
@@ -459,7 +419,6 @@ module.exports = {
   getHomeHeroContent,
   updateHomeHeroContent,
   getServicePackages,
-  getLabTests,
   getServicePackageById,
   createServicePackage,
   updateServicePackage,

@@ -2,7 +2,6 @@ const { Router } = require('express');
 const asyncHandler = require('../utils/asyncHandler');
 const authenticateToken = require('../middleware/authenticate');
 const authorizeRoles = require('../middleware/authorizeRoles');
-const upload = require('../middleware/upload');
 const {
   getOverview,
   getDoctorApplications,
@@ -10,7 +9,6 @@ const {
   searchDoctorsDirectoryHandler,
   getDoctorDirectoryProfile,
   getDoctorAppointmentsForAdminHandler,
-  sendLabReportToPatient,
 } = require('../controllers/adminController');
 const {
   fetchAboutContent,
@@ -117,14 +115,6 @@ router.delete(
   authenticateToken,
   authorizeRoles('admin'),
   asyncHandler(deletePackage)
-);
-
-router.post(
-  '/patients/:id/lab-reports',
-  authenticateToken,
-  authorizeRoles('admin'),
-  upload.single('report'),
-  asyncHandler(sendLabReportToPatient)
 );
 
 module.exports = router;

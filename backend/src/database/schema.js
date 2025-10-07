@@ -12,15 +12,12 @@ async function ensureSchema() {
   await createDoctorApplicationsTable();
   await createPatientDocumentsTable();
   await createDoctorReportsTable();
-  await createLabReportsTable();
   await createSiteContentTable();
   await createServicePackagesTable();
   await createServicePackageItemsTable();
-  await createLabTestsTable();
   await seedDoctors();
   await seedSiteContent();
   await seedServicePackages();
-  await seedLabTests();
   await migrateMissingPatientUsers();
   await seedAdminUser();
   await seedDoctorUsers();
@@ -226,28 +223,6 @@ async function createDoctorReportsTable() {
   );
 }
 
-async function createLabReportsTable() {
-  await execute(
-    `CREATE TABLE IF NOT EXISTS lab_reports (
-      LabReportID INT PRIMARY KEY AUTO_INCREMENT,
-      PatientID INT NOT NULL,
-      AdminID INT NOT NULL,
-      PackageID INT NULL,
-      Title VARCHAR(255) NOT NULL,
-      Description TEXT NULL,
-      FileUrl TEXT NOT NULL,
-      TestName VARCHAR(255) NULL,
-      BaseCharge DECIMAL(10, 2) NOT NULL DEFAULT 0,
-      DiscountAmount DECIMAL(10, 2) NOT NULL DEFAULT 0,
-      FinalCharge DECIMAL(10, 2) NOT NULL DEFAULT 0,
-      CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (PatientID) REFERENCES patients(PatientID) ON DELETE CASCADE,
-      FOREIGN KEY (AdminID) REFERENCES admins(AdminID) ON DELETE CASCADE,
-      FOREIGN KEY (PackageID) REFERENCES service_packages(PackageID) ON DELETE SET NULL
-    )`
-  );
-}
-
 async function createSiteContentTable() {
   await execute(
     `CREATE TABLE IF NOT EXISTS site_content (
@@ -286,22 +261,6 @@ async function createServicePackageItemsTable() {
       FOREIGN KEY (PackageID) REFERENCES service_packages(PackageID)
         ON UPDATE CASCADE
         ON DELETE CASCADE
-    )`
-  );
-}
-
-async function createLabTestsTable() {
-  await execute(
-    `CREATE TABLE IF NOT EXISTS lab_tests (
-      LabTestID INT PRIMARY KEY AUTO_INCREMENT,
-      TestName VARCHAR(255) NOT NULL,
-      Description TEXT NULL,
-      BasePrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
-      PackageID INT NULL,
-      SortOrder INT NOT NULL DEFAULT 0,
-      CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      FOREIGN KEY (PackageID) REFERENCES service_packages(PackageID) ON DELETE SET NULL
     )`
   );
 }
@@ -718,65 +677,6 @@ async function seedServicePackages() {
             [packageId, item.name, item.price, itemIndex]
           )
         )
-      );
-    })
-  );
-}
-
-async function seedLabTests() {
-  const [{ count }] = await execute('SELECT COUNT(*) AS count FROM lab_tests');
-  if (count > 0) {
-    return;
-  }
-
-  const packages = await execute('SELECT PackageID, PackageName FROM service_packages');
-  const packageMap = new Map(packages.map((pkg) => [pkg.PackageName, pkg.PackageID]));
-
-  const tests = [
-    {
-      name: 'Complete Blood Count (CBC)',
-      description: 'Comprehensive blood health screening.',
-      basePrice: 400,
-      packageName: 'Package-1',
-      sortOrder: 1,
-    },
-    {
-      name: 'Lipid Profile (Fasting)',
-      description: 'Cholesterol and triglyceride analysis for cardiac risk.',
-      basePrice: 1400,
-      packageName: 'Package-2',
-      sortOrder: 2,
-    },
-    {
-      name: 'HbA1c',
-      description: 'Three-month average blood glucose monitoring.',
-      basePrice: 1400,
-      packageName: 'Package-2',
-      sortOrder: 3,
-    },
-    {
-      name: 'Ultrasonography of Whole Abdomen',
-      description: 'Detailed abdominal imaging review.',
-      basePrice: 2500,
-      packageName: 'Package-3',
-      sortOrder: 4,
-    },
-    {
-      name: 'Mammography of Both Breast',
-      description: 'Digital mammography screening for women.',
-      basePrice: 3000,
-      packageName: 'Package-4',
-      sortOrder: 5,
-    },
-  ];
-
-  await Promise.all(
-    tests.map((test, index) => {
-      const packageId = test.packageName ? packageMap.get(test.packageName) || null : null;
-      return execute(
-        `INSERT INTO lab_tests (TestName, Description, BasePrice, PackageID, SortOrder)
-         VALUES (?, ?, ?, ?, ?)`,
-        [test.name, test.description, test.basePrice, packageId, test.sortOrder || index]
       );
     })
   );

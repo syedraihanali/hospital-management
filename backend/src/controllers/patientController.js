@@ -4,7 +4,6 @@ const {
   findPatientById,
   listPatientDocuments,
   listPatientReports,
-  listPatientLabReports,
   savePatientDocument,
   updatePatientProfile,
   updatePatientPassword,
@@ -91,11 +90,8 @@ async function getPatientReportsHandler(req, res) {
   }
 
   const { search = '', sort = 'desc' } = req.query;
-  const [doctorReports, labReports] = await Promise.all([
-    listPatientReports(patientId, { search, sort }),
-    listPatientLabReports(patientId, { search, sort }),
-  ]);
-  return res.json({ doctorReports, labReports });
+  const reports = await listPatientReports(patientId, { search, sort });
+  return res.json(reports);
 }
 
 async function uploadPatientDocumentHandler(req, res) {
@@ -173,14 +169,13 @@ async function getPatientTimeline(req, res) {
     return res.status(403).json({ message: 'Access denied.' });
   }
 
-  const [appointments, documents, reports, labReports] = await Promise.all([
+  const [appointments, documents, reports] = await Promise.all([
     listAppointmentsForPatient(patientId),
     listPatientDocuments(patientId),
     listPatientReports(patientId),
-    listPatientLabReports(patientId),
   ]);
 
-  return res.json({ appointments, documents, reports, labReports });
+  return res.json({ appointments, documents, reports });
 }
 
 module.exports = {

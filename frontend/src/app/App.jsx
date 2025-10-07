@@ -17,6 +17,7 @@ import { SiteSettingsProvider } from '../shared/context/SiteSettingsContext';
 import DoctorApplicationPage from '../features/staff/pages/DoctorApplicationPage';
 import SupportButtons from '../shared/components/SupportButtons';
 import MedicalHistoryPage from '../features/patient/pages/MedicalHistoryPage';
+import SpecialistsPage from '../features/specialists/pages/SpecialistsPage';
 
 function App() {
   const { auth } = useContext(AuthContext);
@@ -47,6 +48,7 @@ function App() {
               <Route path="/register" element={guardPublicPage(<RegisterPage />)} />
               <Route path="/about-us" element={guardPublicPage(<AboutUs />)} />
               <Route path="/services" element={guardPublicPage(<ServicesPage />)} />
+              <Route path="/specialists" element={guardPublicPage(<SpecialistsPage />)} />
               <Route path="/reports" element={guardPublicPage(<ReportsPage />)} />
               <Route path="/apply-as-doctor" element={guardPublicPage(<DoctorApplicationPage />)} />
               <Route
