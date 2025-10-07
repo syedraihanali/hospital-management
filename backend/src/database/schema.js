@@ -98,7 +98,8 @@ async function createDoctorsTable() {
       PhoneNumber VARCHAR(50) NULL,
       Specialization VARCHAR(255) NULL,
       AvatarUrl TEXT NULL,
-      ConsultationFee DECIMAL(10, 2) NOT NULL DEFAULT 0
+      ConsultationFee DECIMAL(10, 2) NOT NULL DEFAULT 0,
+      CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
     )`
   );
 
@@ -107,6 +108,7 @@ async function createDoctorsTable() {
   await addColumnIfMissing('doctors', 'Specialization', 'VARCHAR(255) NULL');
   await addColumnIfMissing('doctors', 'AvatarUrl', 'TEXT NULL');
   await addColumnIfMissing('doctors', 'ConsultationFee', 'DECIMAL(10, 2) NOT NULL DEFAULT 0');
+  await addColumnIfMissing('doctors', 'CreatedAt', 'DATETIME DEFAULT CURRENT_TIMESTAMP');
 }
 
 async function createPatientsTable() {
