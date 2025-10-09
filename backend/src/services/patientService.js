@@ -131,6 +131,69 @@ async function listPatientLabReports(patientId, { search = '', sort = 'desc' } =
   );
 }
 
+async function listPatientPackageOrders(patientId) {
+  const rows = await execute(
+    `SELECT
+        po.PackageOrderID,
+        po.PackageID,
+        po.PatientID,
+        po.FullName,
+        po.Email,
+        po.PhoneNumber,
+        po.NidNumber,
+        po.Notes,
+        po.OriginalPrice,
+        po.DiscountedPrice,
+        po.Savings,
+        po.Status,
+        po.PackageSnapshot,
+        po.CreatedAt,
+        sp.PackageName,
+        sp.DiscountedPrice AS CurrentDiscountedPrice,
+        sp.OriginalPrice AS CurrentOriginalPrice
+     FROM package_orders po
+     LEFT JOIN service_packages sp ON po.PackageID = sp.PackageID
+     WHERE po.PatientID = ?
+     ORDER BY po.CreatedAt DESC, po.PackageOrderID DESC`,
+    [patientId]
+  );
+
+  return rows.map((row) => {
+    let snapshot = {};
+    if (row.PackageSnapshot) {
+      try {
+        snapshot = JSON.parse(row.PackageSnapshot);
+      } catch (error) {
+        snapshot = {};
+      }
+    }
+
+    const originalPrice = Number.parseFloat(row.OriginalPrice ?? snapshot.originalPrice ?? 0) || 0;
+    const discountedPrice =
+      Number.parseFloat(row.DiscountedPrice ?? snapshot.discountedPrice ?? row.CurrentDiscountedPrice ?? 0) || 0;
+    const savings = Number.parseFloat(row.Savings ?? snapshot.savings ?? (originalPrice - discountedPrice)) || 0;
+    const discountRate = originalPrice > 0 ? Math.max(0, Math.min(1, 1 - discountedPrice / originalPrice)) : 0;
+
+    return {
+      id: row.PackageOrderID,
+      packageId: row.PackageID,
+      packageName: snapshot.name || row.PackageName || '',
+      status: row.Status || 'pending',
+      purchasedAt: row.CreatedAt,
+      originalPrice,
+      discountedPrice,
+      savings: Number.parseFloat(savings.toFixed(2)),
+      discountRate,
+      fullName: row.FullName,
+      email: row.Email,
+      phoneNumber: row.PhoneNumber,
+      nidNumber: row.NidNumber,
+      notes: row.Notes,
+      items: Array.isArray(snapshot.items) ? snapshot.items : [],
+    };
+  });
+}
+
 async function findPatientByNid(nidNumber) {
   const patients = await execute(
     `SELECT PatientID, FullName, BirthDate, PhoneNumber, Email, Gender, Address, DoctorID, NidNumber, AvatarUrl
@@ -176,4 +239,5 @@ module.exports = {
   updatePatientPassword,
   findPatientByNid,
   listPatientLabReports,
+  listPatientPackageOrders,
 };

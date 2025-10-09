@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FaCheckCircle, FaFileDownload, FaFlask } from 'react-icons/fa';
 import { useSiteSettings } from '../../../shared/context/SiteSettingsContext';
+import { AuthContext } from '../../auth/context/AuthContext';
 
 const apiBaseUrl = (process.env.REACT_APP_API_URL || '').replace(/\/$/, '');
 
@@ -31,6 +32,8 @@ function PackagePurchaseDialog({ open, pkg, form, onChange, onClose, onSubmit, s
   const discountedPrice =
     Number.parseFloat(pkg.discountedPrice ?? pkg.totalPrice ?? pkg.OriginalPrice ?? 0) || 0;
   const savings = Math.max(0, Number.parseFloat((totalPrice - discountedPrice).toFixed(2)));
+  const discountRate = totalPrice > 0 ? Math.max(0, Math.min(1, 1 - discountedPrice / totalPrice)) : 0;
+  const discountPercent = Math.round(discountRate * 100);
   const isSubmitting = status === 'loading';
   const isCompleted = status === 'succeeded';
 
@@ -52,7 +55,12 @@ function PackagePurchaseDialog({ open, pkg, form, onChange, onClose, onSubmit, s
 
         <div className="space-y-6">
           <header className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-brand-primary/80">Buy lab package</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-brand-primary/80">Buy lab package</p>
+              <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                {discountPercent}% off
+              </span>
+            </div>
             <h2 className="text-2xl font-semibold text-slate-900">{pkg.name}</h2>
             {pkg.subtitle ? <p className="text-sm text-slate-600">{pkg.subtitle}</p> : null}
           </header>
@@ -209,6 +217,8 @@ function ServicesPage() {
   const [purchaseStatus, setPurchaseStatus] = useState('idle');
   const [purchaseFeedback, setPurchaseFeedback] = useState('');
   const { siteSettings } = useSiteSettings();
+  const { auth } = useContext(AuthContext);
+  const [patientOrders, setPatientOrders] = useState([]);
 
   const siteName = siteSettings?.siteName ?? 'Destination Health';
 
@@ -249,15 +259,89 @@ function ServicesPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!auth?.token || !auth?.user?.id) {
+      setPatientOrders([]);
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+
+    const loadOrders = async () => {
+      try {
+        const response = await fetch(
+          `${apiBaseUrl}/api/patients/${auth.user.id}/package-orders`,
+          {
+            headers: {
+              Authorization: `Bearer ${auth.token}`,
+            },
+            signal: controller.signal,
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Unable to load your purchased packages.');
+        }
+
+        const data = await response.json().catch(() => ({}));
+        if (!cancelled) {
+          const orders = Array.isArray(data.orders) ? data.orders : [];
+          setPatientOrders(orders);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setPatientOrders([]);
+          console.error(err);
+        }
+      }
+    };
+
+    loadOrders();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [auth?.token, auth?.user?.id]);
+
   const sortedPackages = useMemo(() => {
     return [...packages].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   }, [packages]);
 
   const displayedPackages = sortedPackages;
 
+  const purchasedPackages = useMemo(() => {
+    return patientOrders.filter((order) => order.packageId && order.status !== 'cancelled');
+  }, [patientOrders]);
+
+  const purchasedPackageMap = useMemo(() => {
+    const map = new Map();
+    purchasedPackages.forEach((order) => {
+      const key = String(order.packageId);
+      if (!map.has(key)) {
+        map.set(key, order);
+      }
+    });
+    return map;
+  }, [purchasedPackages]);
+
+  const lastKnownOrder = useMemo(() => {
+    return purchasedPackages[0] || patientOrders[0] || null;
+  }, [patientOrders, purchasedPackages]);
+
   const handleOpenPurchase = (pkg) => {
+    const packageId = pkg.id ?? pkg.PackageID;
+    const orderForPackage = packageId ? purchasedPackageMap.get(String(packageId)) : null;
+
     setPurchaseModal({ open: true, pkg });
-    setPurchaseForm({ ...purchaseFormDefaults });
+    setPurchaseForm({
+      fullName: orderForPackage?.fullName || lastKnownOrder?.fullName || auth?.user?.fullName || '',
+      email: orderForPackage?.email || lastKnownOrder?.email || auth?.user?.email || '',
+      phoneNumber: orderForPackage?.phoneNumber || lastKnownOrder?.phoneNumber || '',
+      nidNumber: orderForPackage?.nidNumber || lastKnownOrder?.nidNumber || '',
+      notes: '',
+    });
     setPurchaseStatus('idle');
     setPurchaseFeedback('');
   };
@@ -300,11 +384,17 @@ function ServicesPage() {
     };
 
     try {
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+
+      if (auth?.token) {
+        headers.Authorization = `Bearer ${auth.token}`;
+      }
+
       const response = await fetch(`${apiBaseUrl}/api/content/service-packages/${packageId}/purchase`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify(payload),
       });
 
@@ -319,6 +409,37 @@ function ServicesPage() {
         data.message ||
           'Your purchase request has been submitted. Our coordination team will call you shortly to confirm the appointment.',
       );
+
+      if (auth?.user?.role === 'patient') {
+        const normalizedPackageId = Number.parseInt(packageId, 10);
+        const numericPackageId = Number.isNaN(normalizedPackageId) ? packageId : normalizedPackageId;
+        const packageInfo = data.package || {};
+        const purchaserInfo = data.purchaser || {};
+        const originalPrice = Number.parseFloat(packageInfo.originalPrice ?? purchaseModal.pkg?.totalPrice ?? 0) || 0;
+        const discountedPrice =
+          Number.parseFloat(packageInfo.discountedPrice ?? purchaseModal.pkg?.discountedPrice ?? 0) || 0;
+        const discountRate = originalPrice > 0 ? Math.max(0, Math.min(1, 1 - discountedPrice / originalPrice)) : 0;
+
+        const newOrder = {
+          id: data.orderId,
+          packageId: numericPackageId,
+          packageName: packageInfo.name || purchaseModal.pkg?.name || '',
+          status: data.status || 'pending',
+          purchasedAt: new Date().toISOString(),
+          originalPrice,
+          discountedPrice,
+          savings: Number.parseFloat((originalPrice - discountedPrice).toFixed(2)),
+          discountRate,
+          fullName: purchaserInfo.fullName || payload.fullName,
+          email: purchaserInfo.email || payload.email,
+          phoneNumber: purchaserInfo.phoneNumber || payload.phoneNumber,
+          nidNumber: purchaserInfo.nidNumber || payload.nidNumber,
+          notes: purchaserInfo.notes || payload.notes,
+          items: Array.isArray(purchaseModal.pkg?.items) ? purchaseModal.pkg.items : [],
+        };
+
+        setPatientOrders((prev) => [newOrder, ...prev]);
+      }
     } catch (err) {
       setPurchaseStatus('failed');
       setPurchaseFeedback(
@@ -409,41 +530,53 @@ function ServicesPage() {
             {displayedPackages.map((pkg) => {
               const packageItems = Array.isArray(pkg.items) ? pkg.items : [];
               const totalPrice = packageItems.reduce(
-                (sum, item) => sum + (Number.parseFloat(item.price ?? 0) || 0),
+                (sum, item) => sum + (Number.parseFloat(item.price ?? item.ItemPrice ?? 0) || 0),
                 0,
               );
               const discountedPrice = Number.parseFloat(pkg.discountedPrice ?? pkg.totalPrice ?? 0) || 0;
-              const savings = Math.max(0, totalPrice - discountedPrice);
+              const savings = Math.max(0, Number.parseFloat((totalPrice - discountedPrice).toFixed(2)));
+              const discountRate = totalPrice > 0 ? Math.max(0, Math.min(1, 1 - discountedPrice / totalPrice)) : 0;
+              const discountPercent = Math.round(discountRate * 100);
+              const packageId = pkg.id ?? pkg.PackageID;
+              const orderForPackage = packageId ? purchasedPackageMap.get(String(packageId)) : null;
+              const isPurchased = Boolean(orderForPackage);
+              const purchaseDate = orderForPackage?.purchasedAt ? new Date(orderForPackage.purchasedAt) : null;
+              const purchaseDateLabel =
+                purchaseDate && !Number.isNaN(purchaseDate.getTime())
+                  ? purchaseDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                  : null;
 
               return (
                 <article
-                  key={pkg.id ?? pkg.name}
-                  className="relative flex h-full flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white/95 p-8 shadow-card backdrop-blur transition hover:translate-y-[-4px] hover:shadow-lg"
+                  key={packageId ?? pkg.name}
+                  className={`relative flex h-full flex-col gap-4 overflow-hidden rounded-[28px] border p-6 shadow-card transition hover:shadow-lg ${
+                    isPurchased ? 'border-emerald-300 bg-emerald-50/70' : 'border-slate-200 bg-white/95'
+                  }`}
                 >
-                  <span className="absolute left-6 top-6 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                    Save {formatCurrency(savings)}
-                  </span>
+                  <div className="absolute left-6 top-6 flex flex-wrap gap-2">
+                    <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                      {discountPercent}% off
+                    </span>
+                    {isPurchased ? (
+                      <span className="inline-flex items-center rounded-full bg-brand-primary px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+                        Purchased
+                      </span>
+                    ) : null}
+                  </div>
 
-                  <header className="mt-12 flex flex-col gap-4">
-                    <div className="space-y-1">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-brand-primary/80">Lab test bundle</p>
-                      <h2 className="text-2xl font-semibold text-brand-primary">{pkg.name}</h2>
-                      {pkg.subtitle ? <p className="text-sm text-slate-600">{pkg.subtitle}</p> : null}
-                    </div>
-                    <div className="self-start rounded-2xl border border-brand-primary/20 bg-brand-primary/5 px-4 py-3 text-right">
-                      <p className="text-xs uppercase tracking-wide text-slate-500">Discounted price</p>
-                      <p className="text-xl font-semibold text-brand-primary">{formatCurrency(discountedPrice)}</p>
-                    </div>
+                  <header className="mt-16 space-y-2">
+                    <h2 className="text-2xl font-semibold text-slate-900">{pkg.name}</h2>
+                    {pkg.subtitle ? <p className="text-sm text-slate-600">{pkg.subtitle}</p> : null}
                   </header>
 
-                  <ul className="mt-6 flex-1 space-y-3">
+                  <ul className="mt-4 flex-1 space-y-2 text-sm text-slate-700">
                     {packageItems.map((item) => (
                       <li
-                        key={item.id ?? `${pkg.name}-${item.name}`}
-                        className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3 text-sm text-slate-700 shadow-sm"
+                        key={item.id ?? item.PackageItemID ?? `${pkg.name}-${item.name}`}
+                        className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-3"
                       >
-                        <span className="pr-3 text-slate-800">{item.name}</span>
-                        <span className="font-semibold text-brand-primary">{formatCurrency(item.price)}</span>
+                        <span className="pr-3 text-slate-800">{item.name ?? item.ItemName}</span>
+                        <span className="font-semibold text-slate-900">{formatCurrency(item.price ?? item.ItemPrice)}</span>
                       </li>
                     ))}
                     {!packageItems.length ? (
@@ -453,13 +586,13 @@ function ServicesPage() {
                     ) : null}
                   </ul>
 
-                  <div className="mt-8 space-y-3 rounded-2xl bg-slate-50 px-5 py-4 text-sm">
+                  <div className="mt-4 space-y-2 rounded-2xl bg-slate-50 px-5 py-4 text-sm">
                     <div className="flex items-center justify-between text-slate-600">
-                      <span>Total value</span>
+                      <span>Total price</span>
                       <span className="font-semibold text-slate-900">{formatCurrency(totalPrice)}</span>
                     </div>
                     <div className="flex items-center justify-between text-brand-primary">
-                      <span>Package price</span>
+                      <span>Discounted price</span>
                       <span className="text-lg font-semibold">{formatCurrency(discountedPrice)}</span>
                     </div>
                     <div className="flex items-center justify-between text-emerald-600">
@@ -468,18 +601,15 @@ function ServicesPage() {
                     </div>
                   </div>
 
-                  <p className="mt-4 flex items-center gap-2 text-sm text-slate-500">
-                    <FaFlask className="text-brand-primary" aria-hidden="true" />
-                    Bundles include consumables, technologist review, and secure digital report delivery.
-                  </p>
-
-                  <div className="mt-6 flex flex-wrap gap-3">
+                  <div className="mt-4 flex flex-wrap gap-3">
                     <button
                       type="button"
                       onClick={() => handleOpenPurchase(pkg)}
-                      className="inline-flex flex-1 items-center justify-center rounded-full bg-brand-primary px-5 py-2 text-sm font-medium text-white transition hover:bg-brand-dark"
+                      className={`inline-flex flex-1 items-center justify-center rounded-full px-5 py-2 text-sm font-medium text-white transition ${
+                        isPurchased ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-brand-primary hover:bg-brand-dark'
+                      }`}
                     >
-                      Buy package
+                      {isPurchased ? 'Purchase again' : 'Buy package'}
                     </button>
                     <Link
                       to="/book-appointment"
@@ -488,6 +618,13 @@ function ServicesPage() {
                       Ask a specialist
                     </Link>
                   </div>
+
+                  <p className="flex items-center gap-2 text-xs text-slate-500">
+                    <FaFlask className="text-brand-primary" aria-hidden="true" />
+                    {isPurchased
+                      ? `Last purchased ${purchaseDateLabel ?? 'recently'}.`
+                      : 'Home sample collection, technologist review, and digital reports included.'}
+                  </p>
                 </article>
               );
             })}

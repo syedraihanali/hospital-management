@@ -17,6 +17,7 @@ async function ensureSchema() {
   await createSiteContentTable();
   await createServicePackagesTable();
   await createServicePackageItemsTable();
+  await createPackageOrdersTable();
   await createLabTestsTable();
   await migrateMissingPatientUsers();
   await seedAdminUser();
@@ -372,6 +373,38 @@ async function createServicePackageItemsTable() {
         ON DELETE CASCADE
     )`
   );
+}
+
+async function createPackageOrdersTable() {
+  await execute(
+    `CREATE TABLE IF NOT EXISTS package_orders (
+      PackageOrderID INT PRIMARY KEY AUTO_INCREMENT,
+      PackageID INT NOT NULL,
+      PatientID INT NULL,
+      FullName VARCHAR(255) NOT NULL,
+      Email VARCHAR(255) NOT NULL,
+      PhoneNumber VARCHAR(50) NOT NULL,
+      NidNumber VARCHAR(100) NULL,
+      Notes TEXT NULL,
+      OriginalPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+      DiscountedPrice DECIMAL(10, 2) NOT NULL DEFAULT 0,
+      Savings DECIMAL(10, 2) NOT NULL DEFAULT 0,
+      Status ENUM('pending', 'confirmed', 'cancelled') NOT NULL DEFAULT 'pending',
+      PackageSnapshot LONGTEXT NULL,
+      CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (PackageID) REFERENCES service_packages(PackageID) ON DELETE CASCADE,
+      FOREIGN KEY (PatientID) REFERENCES patients(PatientID) ON DELETE SET NULL
+    )`
+  );
+
+  await addColumnIfMissing('package_orders', 'PatientID', 'INT NULL');
+  await addColumnIfMissing(
+    'package_orders',
+    'Status',
+    "ENUM('pending','confirmed','cancelled') NOT NULL DEFAULT 'pending'"
+  );
+  await addColumnIfMissing('package_orders', 'PackageSnapshot', 'LONGTEXT NULL');
+  await addColumnIfMissing('package_orders', 'CreatedAt', 'DATETIME DEFAULT CURRENT_TIMESTAMP');
 }
 
 async function createLabTestsTable() {

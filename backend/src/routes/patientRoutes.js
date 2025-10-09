@@ -13,6 +13,7 @@ const {
   updatePatientProfileHandler,
   changePatientPasswordHandler,
   getPatientTimeline,
+  getPatientPackageOrdersHandler,
 } = require('../controllers/patientController');
 
 const router = Router();
@@ -62,6 +63,12 @@ router.get(
   authenticateToken,
   authorizeRoles('patient'),
   asyncHandler(getPatientTimeline)
+);
+router.get(
+  '/:id/package-orders',
+  authenticateToken,
+  authorizeRoles('patient', 'admin'),
+  asyncHandler(getPatientPackageOrdersHandler)
 );
 
 module.exports = router;
