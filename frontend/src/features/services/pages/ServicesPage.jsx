@@ -291,8 +291,18 @@ function ServicesPage() {
       setError('');
 
       try {
-        const response = await fetch(`${apiBaseUrl}/api/content/service-packages`);
+        const requestUrl = `${apiBaseUrl}/api/content/service-packages`;
+        console.log('[ServicesPage] Fetching service packages', { url: requestUrl });
+
+        const response = await fetch(requestUrl);
         const data = await response.json().catch(() => []);
+
+        console.log('[ServicesPage] Service packages API response', {
+          status: response.status,
+          ok: response.ok,
+          packageCount: Array.isArray(data) ? data.length : 0,
+          raw: data,
+        });
 
         if (!response.ok) {
           throw new Error(data.message || 'Unable to load service packages.');
@@ -307,6 +317,7 @@ function ServicesPage() {
           setPackages([]);
           setError(err.message || 'An unexpected error occurred while loading the packages.');
         }
+        console.error('[ServicesPage] Failed to load service packages', err);
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -454,6 +465,11 @@ function ServicesPage() {
         headers.Authorization = `Bearer ${auth.token}`;
       }
 
+      console.log('[ServicesPage] Submitting package purchase request', {
+        packageId,
+        payload,
+      });
+
       const response = await fetch(`${apiBaseUrl}/api/content/service-packages/${packageId}/purchase`, {
         method: 'POST',
         headers,
@@ -461,6 +477,12 @@ function ServicesPage() {
       });
 
       const data = await response.json().catch(() => ({}));
+
+      console.log('[ServicesPage] Purchase API response received', {
+        status: response.status,
+        ok: response.ok,
+        data,
+      });
 
       if (!response.ok) {
         throw new Error(data.message || 'Unable to submit your purchase request.');
@@ -507,6 +529,7 @@ function ServicesPage() {
       setPurchaseFeedback(
         err.message || 'Unable to submit your purchase request right now. Please try again in a moment.',
       );
+      console.error('[ServicesPage] Purchase request failed', err);
     }
   };
 
