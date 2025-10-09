@@ -13,7 +13,11 @@ function parseJSON(value, fallback = {}) {
 }
 
 function normalizeStrings(value) {
-  return typeof value === 'string' ? value : '';
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  return value.trim();
 }
 
 function trimString(value) {
@@ -177,9 +181,13 @@ async function updateHomeHeroContent(content) {
 }
 
 function normalizePackagePayload(payload = {}) {
-  const items = Array.isArray(payload.items) ? payload.items : [];
+  const rawItems = Array.isArray(payload.items)
+    ? payload.items
+    : Array.isArray(payload.packageItems)
+    ? payload.packageItems
+    : [];
 
-  const sanitizedItems = items
+  const sanitizedItems = rawItems
     .map((item) => {
       const rawId =
         item.id !== undefined && item.id !== null
@@ -194,10 +202,14 @@ function normalizePackagePayload(payload = {}) {
       const normalizedIdNumber = Number.parseInt(normalizedIdSource, 10);
       const normalizedId = Number.isNaN(normalizedIdNumber) ? null : normalizedIdNumber;
 
+      const resolvedName = normalizeStrings(item.name || item.ItemName || item.title || '');
+      const rawPrice = item.price ?? item.ItemPrice ?? item.amount ?? 0;
+      const numericPrice = Number.parseFloat(Array.isArray(rawPrice) ? rawPrice[0] : rawPrice);
+
       return {
         id: normalizedId,
-        name: normalizeStrings(item.name || item.ItemName),
-        price: Math.max(0, Number.parseFloat(item.price ?? item.ItemPrice ?? 0) || 0),
+        name: resolvedName,
+        price: Number.isNaN(numericPrice) ? 0 : Math.max(0, numericPrice),
       };
     })
     .filter((item) => item.name.length > 0);
@@ -362,15 +374,14 @@ async function createServicePackage(payload) {
 
     const packageId = result.insertId;
 
-    await Promise.all(
-      normalized.items.map((item, index) =>
-        connection.execute(
-          `INSERT INTO service_package_items (PackageID, ItemName, ItemPrice, SortOrder)
-           VALUES (?, ?, ?, ?)`,
-          [packageId, item.name, item.price, index]
-        )
-      )
-    );
+    for (let index = 0; index < normalized.items.length; index += 1) {
+      const item = normalized.items[index];
+      await connection.execute(
+        `INSERT INTO service_package_items (PackageID, ItemName, ItemPrice, SortOrder)
+         VALUES (?, ?, ?, ?)`,
+        [packageId, item.name, item.price, index]
+      );
+    }
 
     return packageId;
   }).then((packageId) => getServicePackageById(packageId));

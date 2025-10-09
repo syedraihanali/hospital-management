@@ -117,19 +117,37 @@ function ServicePackagesTab({ token }) {
     ]);
   };
 
-  const buildPackagePayload = (pkg) => ({
-    name: (pkg.name || '').trim(),
-    subtitle: (pkg.subtitle || '').trim(),
-    discountedPrice: Number.parseFloat(pkg.discountedPrice) || 0,
-    sortOrder: Number.parseInt(pkg.sortOrder, 10) || 0,
-    items: (pkg.items || [])
-      .map((item) => ({
-        id: item.id || undefined,
-        name: (item.name || '').trim(),
-        price: Number.parseFloat(item.price) || 0,
-      }))
-      .filter((item) => item.name.length > 0),
-  });
+  const buildPackagePayload = (pkg) => {
+    const normalizedItems = Array.isArray(pkg.items) ? pkg.items : [];
+
+    const items = normalizedItems
+      .map((item) => {
+        const trimmedName = (item.name || '').trim();
+        const rawPrice = item.price ?? item.ItemPrice ?? '';
+        const parsedPrice = Number.parseFloat(rawPrice);
+
+        return {
+          id: item.id || item.packageItemId || item.PackageItemID || undefined,
+          name: trimmedName,
+          price: Number.isNaN(parsedPrice) ? 0 : Math.max(0, parsedPrice),
+        };
+      })
+      .filter((item) => item.name.length > 0);
+
+    return {
+      name: (pkg.name || '').trim(),
+      subtitle: (pkg.subtitle || '').trim(),
+      discountedPrice: (() => {
+        const parsed = Number.parseFloat(pkg.discountedPrice);
+        return Number.isNaN(parsed) ? 0 : Math.max(0, parsed);
+      })(),
+      sortOrder: (() => {
+        const parsed = Number.parseInt(pkg.sortOrder, 10);
+        return Number.isNaN(parsed) ? 0 : parsed;
+      })(),
+      items,
+    };
+  };
 
   const handleSavePackage = async (pkg, originalIndex) => {
     if (!token) {
