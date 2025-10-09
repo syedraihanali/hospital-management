@@ -15,6 +15,10 @@ function LabReportsTab({ token }) {
     packageId: '',
     file: null,
   });
+  const [patientPackageOrders, setPatientPackageOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState('');
+  const [hasManualPackageSelection, setHasManualPackageSelection] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState('idle');
   const [feedback, setFeedback] = useState('');
 
@@ -55,8 +59,77 @@ function LabReportsTab({ token }) {
     loadData();
   }, [apiBaseUrl, token]);
 
+  useEffect(() => {
+    if (!form.patientId || !token) {
+      setPatientPackageOrders([]);
+      setOrdersError('');
+      setOrdersLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+
+    const loadOrders = async () => {
+      setOrdersLoading(true);
+      setOrdersError('');
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/patients/${form.patientId}/package-orders`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error('Unable to load package history for this patient.');
+        }
+
+        const data = await response.json().catch(() => ({}));
+        if (!cancelled) {
+          const orders = Array.isArray(data.orders) ? data.orders : [];
+          setPatientPackageOrders(orders);
+
+          if (!hasManualPackageSelection) {
+            const recentPackage = orders.find((order) => order.packageId);
+            if (recentPackage) {
+              setForm((prev) => ({ ...prev, packageId: String(recentPackage.packageId) }));
+            }
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setOrdersError(err.message || 'Failed to load patient packages.');
+          setPatientPackageOrders([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setOrdersLoading(false);
+        }
+      }
+    };
+
+    loadOrders();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [apiBaseUrl, form.patientId, hasManualPackageSelection, token]);
+
   const handleInputChange = (event) => {
     const { name, value } = event.target;
+
+    if (name === 'patientId') {
+      setHasManualPackageSelection(false);
+      setOrdersError('');
+      setPatientPackageOrders([]);
+      setForm((prev) => ({ ...prev, patientId: value, packageId: '' }));
+      return;
+    }
+
+    if (name === 'packageId') {
+      setHasManualPackageSelection(true);
+    }
+
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -71,6 +144,24 @@ function LabReportsTab({ token }) {
     }
     return packages.find((pkg) => String(pkg.id ?? pkg.PackageID) === String(form.packageId)) || null;
   }, [form.packageId, packages]);
+
+  const latestPatientOrder = useMemo(() => {
+    if (!patientPackageOrders.length) {
+      return null;
+    }
+    return patientPackageOrders.find((order) => order.packageId) || patientPackageOrders[0];
+  }, [patientPackageOrders]);
+
+  const latestOrderDateLabel = useMemo(() => {
+    if (!latestPatientOrder?.purchasedAt) {
+      return '';
+    }
+    const date = new Date(latestPatientOrder.purchasedAt);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }, [latestPatientOrder]);
 
   const baseChargeValue = useMemo(() => {
     const parsed = Number.parseFloat(form.baseCharge);
@@ -148,6 +239,9 @@ function LabReportsTab({ token }) {
         packageId: '',
         file: null,
       });
+      setPatientPackageOrders([]);
+      setHasManualPackageSelection(false);
+      setOrdersError('');
     } catch (err) {
       setSubmissionStatus('failed');
       setFeedback(err.message || 'Failed to send the lab report.');
@@ -261,6 +355,16 @@ function LabReportsTab({ token }) {
               );
             })}
           </select>
+          {ordersLoading ? (
+            <p className="text-xs text-slate-500">Loading purchased packages…</p>
+          ) : null}
+          {ordersError ? <p className="text-xs text-rose-600">{ordersError}</p> : null}
+          {!ordersLoading && !ordersError && latestPatientOrder ? (
+            <p className="text-xs text-emerald-600">
+              Latest purchase: {latestPatientOrder.packageName || 'Package'}
+              {latestOrderDateLabel ? ` · ${latestOrderDateLabel}` : ''}
+            </p>
+          ) : null}
         </label>
 
         <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">

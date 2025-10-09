@@ -5,6 +5,7 @@ const {
   listPatientDocuments,
   listPatientReports,
   listPatientLabReports,
+  listPatientPackageOrders,
   savePatientDocument,
   updatePatientProfile,
   updatePatientPassword,
@@ -173,14 +174,26 @@ async function getPatientTimeline(req, res) {
     return res.status(403).json({ message: 'Access denied.' });
   }
 
-  const [appointments, documents, reports, labReports] = await Promise.all([
+  const [appointments, documents, reports, labReports, packageOrders] = await Promise.all([
     listAppointmentsForPatient(patientId),
     listPatientDocuments(patientId),
     listPatientReports(patientId),
     listPatientLabReports(patientId),
+    listPatientPackageOrders(patientId),
   ]);
 
-  return res.json({ appointments, documents, reports, labReports });
+  return res.json({ appointments, documents, reports, labReports, packageOrders });
+}
+
+async function getPatientPackageOrdersHandler(req, res) {
+  const patientId = Number.parseInt(req.params.id, 10);
+
+  if (req.user.role === 'patient' && req.user.id !== patientId) {
+    return res.status(403).json({ message: 'Access denied.' });
+  }
+
+  const orders = await listPatientPackageOrders(patientId);
+  return res.json({ orders });
 }
 
 module.exports = {
@@ -193,4 +206,5 @@ module.exports = {
   updatePatientProfileHandler,
   changePatientPasswordHandler,
   getPatientTimeline,
+  getPatientPackageOrdersHandler,
 };

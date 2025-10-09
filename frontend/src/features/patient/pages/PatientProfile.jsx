@@ -11,6 +11,7 @@ function PatientProfile() {
   const [profile, setProfile] = useState(null);
   const [appointmentHistory, setAppointmentHistory] = useState([]);
   const [labReports, setLabReports] = useState([]);
+  const [packageOrders, setPackageOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [profileForm, setProfileForm] = useState(null);
@@ -57,6 +58,7 @@ function PatientProfile() {
         Array.isArray(timelineData.appointments) ? timelineData.appointments : []
       );
       setLabReports(Array.isArray(timelineData.labReports) ? timelineData.labReports : []);
+      setPackageOrders(Array.isArray(timelineData.packageOrders) ? timelineData.packageOrders : []);
       setProfileForm({
         fullName: profileData.FullName || '',
         phoneNumber: profileData.PhoneNumber || '',
@@ -86,6 +88,7 @@ function PatientProfile() {
       const data = await response.json();
       setAppointmentHistory(Array.isArray(data.appointments) ? data.appointments : []);
       setLabReports(Array.isArray(data.labReports) ? data.labReports : []);
+      setPackageOrders(Array.isArray(data.packageOrders) ? data.packageOrders : []);
     } catch (err) {
       setError(err.message || 'Failed to refresh history.');
     }
@@ -143,6 +146,29 @@ function PatientProfile() {
         : b.dateValue.getTime() - a.dateValue.getTime()
     );
   }, [appointmentHistory, searchTerm, sortOrder]);
+
+  const recentPackages = useMemo(() => {
+    return (packageOrders || [])
+      .map((order) => {
+        const original = Number.parseFloat(order.originalPrice ?? order.OriginalPrice ?? 0) || 0;
+        const discounted = Number.parseFloat(order.discountedPrice ?? order.DiscountedPrice ?? 0) || 0;
+        const savings = Number.parseFloat(order.savings ?? order.Savings ?? original - discounted) || 0;
+        const discountRate = original > 0 ? Math.max(0, Math.min(1, 1 - discounted / original)) : 0;
+
+        return {
+          id: order.id ?? order.PackageOrderID ?? `package-order-${order.packageId}-${order.purchasedAt}`,
+          packageId: order.packageId ?? order.PackageID,
+          name: order.packageName || 'Service package',
+          purchasedAt: order.purchasedAt ?? order.CreatedAt,
+          originalPrice: original,
+          discountedPrice: discounted,
+          savings: Number.parseFloat(savings.toFixed(2)),
+          discountRate,
+          status: order.status || 'pending',
+        };
+      })
+      .slice(0, 4);
+  }, [packageOrders]);
 
   const recentLabReports = useMemo(() => {
     return (labReports || [])
@@ -501,6 +527,78 @@ function PatientProfile() {
             </form>
           </div>
         </article>
+      </section>
+
+      <section className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card backdrop-blur">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-brand-primary">Your lab packages</h2>
+            <p className="text-sm text-slate-600">
+              Track recent package purchases and the savings applied to your reports.
+            </p>
+          </div>
+          <Link
+            to="/services"
+            className="inline-flex items-center justify-center rounded-full border border-brand-primary px-4 py-2 text-xs font-semibold text-brand-primary transition hover:bg-brand-primary hover:text-white"
+          >
+            Browse packages
+          </Link>
+        </div>
+
+        {recentPackages.length ? (
+          <ul className="mt-6 grid gap-4">
+            {recentPackages.map((order) => {
+              const discountPercent = Math.round(order.discountRate * 100);
+              const statusColor =
+                order.status === 'confirmed'
+                  ? 'text-emerald-600'
+                  : order.status === 'cancelled'
+                  ? 'text-rose-600'
+                  : 'text-amber-600';
+
+              return (
+                <li
+                  key={order.id}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700 shadow-sm"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-base font-semibold text-slate-900">{order.name}</p>
+                      <p className="text-xs text-slate-500">{formatDateTime(order.purchasedAt)}</p>
+                    </div>
+                    <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                      {discountPercent}% off
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                    <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Original price</p>
+                      <p className="text-sm font-semibold text-slate-900">{formatCurrency(order.originalPrice)}</p>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Paid price</p>
+                      <p className="text-sm font-semibold text-brand-primary">{formatCurrency(order.discountedPrice)}</p>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">You saved</p>
+                      <p className="text-sm font-semibold text-emerald-600">{formatCurrency(order.savings)}</p>
+                    </div>
+                  </div>
+
+                  <p className={`mt-3 text-xs font-semibold ${statusColor}`}>
+                    Status: {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600">
+            You have not purchased any lab packages yet. Visit the services page to explore curated bundles and unlock instant
+            discounts.
+          </div>
+        )}
       </section>
 
       {recentLabReports.length ? (

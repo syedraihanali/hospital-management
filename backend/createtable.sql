@@ -128,6 +128,7 @@ CREATE TABLE IF NOT EXISTS service_package_items (
 CREATE TABLE IF NOT EXISTS package_orders (
     PackageOrderID INT AUTO_INCREMENT PRIMARY KEY,
     PackageID INT NOT NULL,
+    PatientID INT NULL,
     FullName VARCHAR(255) NOT NULL,
     Email VARCHAR(255) NOT NULL,
     PhoneNumber VARCHAR(50) NOT NULL,
@@ -141,7 +142,10 @@ CREATE TABLE IF NOT EXISTS package_orders (
     CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (PackageID) REFERENCES service_packages(PackageID)
         ON UPDATE CASCADE
-        ON DELETE CASCADE
+        ON DELETE CASCADE,
+    FOREIGN KEY (PatientID) REFERENCES patients(PatientID)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_patients_email ON patients(Email);

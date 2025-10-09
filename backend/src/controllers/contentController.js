@@ -6,6 +6,7 @@ const {
   getLabTests,
   createServicePackageOrder,
 } = require('../services/contentService');
+const { findPatientById } = require('../services/patientService');
 
 async function fetchAboutContent(_req, res) {
   const content = await getAboutContent();
@@ -62,17 +63,32 @@ async function purchaseServicePackage(req, res) {
     notes = '',
   } = req.body || {};
 
-  const trimmedName = String(fullName).trim();
+  let patientId = null;
+  let patientProfile = null;
+
+  if (req.user?.role === 'patient') {
+    const parsedPatientId = Number.parseInt(req.user.id, 10);
+    if (!Number.isNaN(parsedPatientId)) {
+      patientProfile = await findPatientById(parsedPatientId);
+      if (patientProfile) {
+        patientId = patientProfile.PatientID;
+      }
+    }
+  }
+
+  const trimmedName = String(fullName || patientProfile?.FullName || '').trim();
   if (!trimmedName) {
     return res.status(400).json({ message: 'Full name is required.' });
   }
 
-  const trimmedEmail = String(email).trim().toLowerCase();
+  const trimmedEmail = String(email || patientProfile?.Email || '')
+    .trim()
+    .toLowerCase();
   if (!trimmedEmail || !isValidEmail(trimmedEmail)) {
     return res.status(400).json({ message: 'A valid email address is required.' });
   }
 
-  const rawPhone = phoneNumber || phone;
+  const rawPhone = phoneNumber || phone || patientProfile?.PhoneNumber;
   const trimmedPhone = normalizePhone(rawPhone);
   if (!trimmedPhone) {
     return res.status(400).json({ message: 'A valid phone number is required.' });
@@ -92,6 +108,7 @@ async function purchaseServicePackage(req, res) {
       phoneNumber: trimmedPhone,
       nidNumber: trimmedNid,
       notes: trimmedNotes,
+      patientId,
     });
     return res.status(201).json(order);
   } catch (error) {

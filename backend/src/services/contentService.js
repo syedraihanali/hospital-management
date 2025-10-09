@@ -476,6 +476,9 @@ async function createServicePackageOrder(packageId, payload = {}) {
     notes: trimString(payload.notes),
   };
 
+  const patientIdValue = Number.parseInt(payload.patientId, 10);
+  const normalizedPatientId = Number.isNaN(patientIdValue) ? null : patientIdValue;
+
   if (!sanitized.fullName) {
     const error = new Error('Full name is required.');
     error.status = 400;
@@ -511,10 +514,11 @@ async function createServicePackageOrder(packageId, payload = {}) {
 
   const result = await execute(
     `INSERT INTO package_orders
-      (PackageID, FullName, Email, PhoneNumber, NidNumber, Notes, OriginalPrice, DiscountedPrice, Savings, Status, PackageSnapshot)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+      (PackageID, PatientID, FullName, Email, PhoneNumber, NidNumber, Notes, OriginalPrice, DiscountedPrice, Savings, Status, PackageSnapshot)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
     [
       servicePackage.id,
+      normalizedPatientId,
       sanitized.fullName,
       sanitized.email,
       sanitized.phoneNumber,
@@ -547,6 +551,7 @@ async function createServicePackageOrder(packageId, payload = {}) {
       nidNumber: sanitized.nidNumber,
       notes: sanitized.notes,
     },
+    patientId: normalizedPatientId,
   };
 }
 
