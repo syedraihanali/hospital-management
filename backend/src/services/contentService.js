@@ -366,6 +366,19 @@ async function createServicePackage(payload) {
   return transaction(async (connection) => {
     const totalPrice = normalized.items.reduce((sum, item) => sum + Number(item.price), 0);
 
+    console.log('[ServicePackages] Creating package draft for persistence', {
+      name: normalized.name,
+      subtitle: normalized.subtitle,
+      discountedPrice: normalized.discountedPrice,
+      sortOrder: normalized.sortOrder,
+      totalPrice,
+      items: normalized.items.map((item, index) => ({
+        name: item.name,
+        price: item.price,
+        sortOrder: index,
+      })),
+    });
+
     const [result] = await connection.execute(
       `INSERT INTO service_packages (PackageName, Subtitle, OriginalPrice, DiscountedPrice, SortOrder)
        VALUES (?, ?, ?, ?, ?)`,
@@ -373,6 +386,7 @@ async function createServicePackage(payload) {
     );
 
     const packageId = result.insertId;
+    const persistedItems = [];
 
     for (let index = 0; index < normalized.items.length; index += 1) {
       const item = normalized.items[index];
@@ -381,10 +395,29 @@ async function createServicePackage(payload) {
          VALUES (?, ?, ?, ?)`,
         [packageId, item.name, item.price, index]
       );
+      persistedItems.push({
+        name: item.name,
+        price: item.price,
+        sortOrder: index,
+      });
     }
 
+    console.log('[ServicePackages] Package persisted with items', {
+      packageId,
+      itemCount: persistedItems.length,
+      items: persistedItems,
+    });
+
     return packageId;
-  }).then((packageId) => getServicePackageById(packageId));
+  }).then(async (packageId) => {
+    const storedPackage = await getServicePackageById(packageId);
+    console.log('[ServicePackages] Retrieved package from database after creation', {
+      packageId,
+      hasItems: Array.isArray(storedPackage?.items) && storedPackage.items.length > 0,
+      itemCount: Array.isArray(storedPackage?.items) ? storedPackage.items.length : 0,
+    });
+    return storedPackage;
+  });
 }
 
 async function updateServicePackage(packageId, payload) {
