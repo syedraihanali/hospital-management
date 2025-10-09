@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FaCheckCircle, FaFileDownload, FaFlask } from 'react-icons/fa';
 import { useSiteSettings } from '../../../shared/context/SiteSettingsContext';
@@ -229,6 +229,60 @@ function ServicesPage() {
 
   const siteName = siteSettings?.siteName ?? 'Destination Health';
 
+  const normalizeServicePackage = useCallback((pkg) => {
+    const rawItems = Array.isArray(pkg.items)
+      ? pkg.items
+      : Array.isArray(pkg.packageItems)
+      ? pkg.packageItems
+      : [];
+
+    const items = rawItems.map((item, index) => {
+      const resolvedPrice =
+        item.price !== undefined && item.price !== null
+          ? item.price
+          : item.ItemPrice !== undefined && item.ItemPrice !== null
+          ? item.ItemPrice
+          : item.amount ?? 0;
+
+      const parsedPrice = Number.parseFloat(Array.isArray(resolvedPrice) ? resolvedPrice[0] : resolvedPrice);
+      const normalizedPrice = Number.isNaN(parsedPrice) ? 0 : Math.max(0, parsedPrice);
+
+      return {
+        ...item,
+        id: item.id ?? item.PackageItemID ?? item.packageItemId ?? index,
+        name: item.name ?? item.ItemName ?? '',
+        price: normalizedPrice,
+        sortOrder:
+          item.sortOrder !== undefined && item.sortOrder !== null
+            ? Number.parseInt(item.sortOrder, 10) || 0
+            : item.SortOrder !== undefined && item.SortOrder !== null
+            ? Number.parseInt(item.SortOrder, 10) || 0
+            : index,
+      };
+    });
+
+    const totalPrice = items.reduce((sum, item) => sum + Number.parseFloat(item.price || 0), 0);
+    const rawDiscounted = pkg.discountedPrice ?? pkg.DiscountedPrice ?? pkg.totalPrice ?? 0;
+    const parsedDiscounted = Number.parseFloat(rawDiscounted);
+    const discountedPrice = Number.isNaN(parsedDiscounted) ? 0 : Math.max(0, parsedDiscounted);
+
+    return {
+      ...pkg,
+      id: pkg.id ?? pkg.PackageID ?? pkg.packageId ?? null,
+      name: pkg.name ?? pkg.PackageName ?? '',
+      subtitle: pkg.subtitle ?? pkg.Subtitle ?? '',
+      discountedPrice,
+      totalPrice,
+      sortOrder:
+        pkg.sortOrder !== undefined && pkg.sortOrder !== null
+          ? Number.parseInt(pkg.sortOrder, 10) || 0
+          : pkg.SortOrder !== undefined && pkg.SortOrder !== null
+          ? Number.parseInt(pkg.SortOrder, 10) || 0
+          : 0,
+      items: items.sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id),
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -245,7 +299,8 @@ function ServicesPage() {
         }
 
         if (!cancelled) {
-          setPackages(Array.isArray(data) ? data : []);
+          const list = Array.isArray(data) ? data.map(normalizeServicePackage) : [];
+          setPackages(list);
         }
       } catch (err) {
         if (!cancelled) {
@@ -264,7 +319,7 @@ function ServicesPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [normalizeServicePackage]);
 
   useEffect(() => {
     if (!auth?.token || !auth?.user?.id) {
