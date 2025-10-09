@@ -131,7 +131,7 @@ function ServicePackagesTab({ token }) {
       .filter((item) => item.name.length > 0),
   });
 
-  const handleSavePackage = async (pkg, index) => {
+  const handleSavePackage = async (pkg, originalIndex) => {
     if (!token) {
       return;
     }
@@ -147,7 +147,7 @@ function ServicePackagesTab({ token }) {
       return;
     }
 
-    const key = pkg.id ?? `new-${index}`;
+    const key = pkg.id ?? `new-${originalIndex}`;
     setSavingKey(key);
     setFeedback(null);
 
@@ -174,7 +174,7 @@ function ServicePackagesTab({ token }) {
       const result = await response.json();
       setPackages((prev) => {
         const next = [...prev];
-        next[index] = mapPackageResponseToForm(result);
+        next[originalIndex] = mapPackageResponseToForm(result);
         return next;
       });
       setFeedback({ type: 'success', message: `${result.name || 'Package'} saved successfully.` });
@@ -185,13 +185,13 @@ function ServicePackagesTab({ token }) {
     }
   };
 
-  const handleDeletePackage = async (pkg, index) => {
+  const handleDeletePackage = async (pkg, originalIndex) => {
     if (!token) {
       return;
     }
 
     if (!pkg.id) {
-      setPackages((prev) => prev.filter((_, idx) => idx !== index));
+      setPackages((prev) => prev.filter((_, idx) => idx !== originalIndex));
       setFeedback({ type: 'success', message: 'Draft package removed.' });
       return;
     }
@@ -216,7 +216,7 @@ function ServicePackagesTab({ token }) {
         throw new Error('Unable to delete the service package.');
       }
 
-      setPackages((prev) => prev.filter((_, idx) => idx !== index));
+      setPackages((prev) => prev.filter((_, idx) => idx !== originalIndex));
       setFeedback({ type: 'success', message: `${pkg.name} removed successfully.` });
     } catch (err) {
       setFeedback({ type: 'error', message: err.message || 'Failed to delete package.' });
@@ -226,7 +226,13 @@ function ServicePackagesTab({ token }) {
   };
 
   const sortedPackages = useMemo(
-    () => [...packages].sort((a, b) => (Number.parseInt(a.sortOrder, 10) || 0) - (Number.parseInt(b.sortOrder, 10) || 0)),
+    () =>
+      packages
+        .map((pkg, originalIndex) => ({ pkg, originalIndex }))
+        .sort(
+          (a, b) =>
+            (Number.parseInt(a.pkg.sortOrder, 10) || 0) - (Number.parseInt(b.pkg.sortOrder, 10) || 0)
+        ),
     [packages],
   );
 
@@ -291,12 +297,13 @@ function ServicePackagesTab({ token }) {
       ) : null}
 
       <div className="space-y-6">
-        {sortedPackages.map((pkg, index) => {
-          const key = pkg.id ?? `draft-${index}`;
+        {sortedPackages.map(({ pkg, originalIndex }) => {
+          const key = pkg.id ?? `draft-${originalIndex}`;
           const items = Array.isArray(pkg.items) ? pkg.items : [];
           const total = items.reduce((sum, item) => sum + (Number.parseFloat(item.price) || 0), 0);
           const discounted = Number.parseFloat(pkg.discountedPrice) || 0;
           const saving = Math.max(0, total - discounted);
+          const savingKeyForPackage = pkg.id ?? `new-${originalIndex}`;
 
           return (
             <article key={key} className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5">
@@ -307,7 +314,7 @@ function ServicePackagesTab({ token }) {
                     <input
                       type="text"
                       value={pkg.name}
-                      onChange={(event) => handlePackageFieldChange(index, 'name', event.target.value)}
+                      onChange={(event) => handlePackageFieldChange(originalIndex, 'name', event.target.value)}
                       className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-brand-primary focus:outline-none"
                     />
                   </label>
@@ -316,7 +323,7 @@ function ServicePackagesTab({ token }) {
                     <input
                       type="text"
                       value={pkg.subtitle}
-                      onChange={(event) => handlePackageFieldChange(index, 'subtitle', event.target.value)}
+                      onChange={(event) => handlePackageFieldChange(originalIndex, 'subtitle', event.target.value)}
                       className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-brand-primary focus:outline-none"
                     />
                   </label>
@@ -328,7 +335,7 @@ function ServicePackagesTab({ token }) {
                     <input
                       type="number"
                       value={pkg.sortOrder}
-                      onChange={(event) => handlePackageFieldChange(index, 'sortOrder', event.target.value)}
+                      onChange={(event) => handlePackageFieldChange(originalIndex, 'sortOrder', event.target.value)}
                       className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-brand-primary focus:outline-none"
                     />
                   </label>
@@ -339,7 +346,7 @@ function ServicePackagesTab({ token }) {
                       min="0"
                       step="0.01"
                       value={pkg.discountedPrice}
-                      onChange={(event) => handlePackageFieldChange(index, 'discountedPrice', event.target.value)}
+                      onChange={(event) => handlePackageFieldChange(originalIndex, 'discountedPrice', event.target.value)}
                       className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-brand-primary focus:outline-none"
                     />
                   </label>
@@ -359,7 +366,7 @@ function ServicePackagesTab({ token }) {
                   <h4 className="text-sm font-semibold text-slate-700">Lab tests in this package</h4>
                   <button
                     type="button"
-                    onClick={() => handleAddPackageItem(index)}
+                    onClick={() => handleAddPackageItem(originalIndex)}
                     className="text-sm font-medium text-brand-primary hover:text-brand-dark"
                   >
                     + Add item
@@ -373,7 +380,7 @@ function ServicePackagesTab({ token }) {
                         <input
                           type="text"
                           value={item.name}
-                          onChange={(event) => handlePackageItemChange(index, itemIndex, 'name', event.target.value)}
+                          onChange={(event) => handlePackageItemChange(originalIndex, itemIndex, 'name', event.target.value)}
                           className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-brand-primary focus:outline-none"
                         />
                       </label>
@@ -384,13 +391,13 @@ function ServicePackagesTab({ token }) {
                           min="0"
                           step="0.01"
                           value={item.price}
-                          onChange={(event) => handlePackageItemChange(index, itemIndex, 'price', event.target.value)}
+                          onChange={(event) => handlePackageItemChange(originalIndex, itemIndex, 'price', event.target.value)}
                           className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-brand-primary focus:outline-none"
                         />
                       </label>
                       <button
                         type="button"
-                        onClick={() => handleRemovePackageItem(index, itemIndex)}
+                        onClick={() => handleRemovePackageItem(originalIndex, itemIndex)}
                         className="self-start text-xs font-medium text-rose-500 hover:text-rose-600"
                       >
                         Remove item
@@ -403,15 +410,15 @@ function ServicePackagesTab({ token }) {
               <div className="flex flex-wrap gap-3">
                 <button
                   type="button"
-                  onClick={() => handleSavePackage(pkg, index)}
-                  disabled={savingKey === (pkg.id ?? `new-${index}`)}
+                  onClick={() => handleSavePackage(pkg, originalIndex)}
+                  disabled={savingKey === savingKeyForPackage}
                   className="inline-flex items-center justify-center rounded-full bg-brand-primary px-5 py-2 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-slate-400"
                 >
-                  {savingKey === (pkg.id ?? `new-${index}`) ? 'Saving...' : 'Save package'}
+                  {savingKey === savingKeyForPackage ? 'Saving...' : 'Save package'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleDeletePackage(pkg, index)}
+                  onClick={() => handleDeletePackage(pkg, originalIndex)}
                   disabled={deletingKey === pkg.id}
                   className="inline-flex items-center justify-center rounded-full border border-rose-300 px-5 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
                 >
