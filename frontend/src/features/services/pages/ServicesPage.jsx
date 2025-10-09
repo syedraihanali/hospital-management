@@ -25,12 +25,19 @@ function PackagePurchaseDialog({ open, pkg, form, onChange, onClose, onSubmit, s
   }
 
   const packageItems = Array.isArray(pkg.items) ? pkg.items : [];
-  const totalPrice = packageItems.reduce(
+  const computedTotal = packageItems.reduce(
     (sum, item) => sum + (Number.parseFloat(item.price ?? item.ItemPrice ?? 0) || 0),
     0,
   );
+  const originalPrice =
+    Number.parseFloat(
+      pkg.totalPrice ?? pkg.originalPrice ?? pkg.OriginalPrice ?? pkg.TotalPrice ?? computedTotal,
+    ) || 0;
+  const totalPrice = originalPrice > 0 ? originalPrice : computedTotal;
   const discountedPrice =
-    Number.parseFloat(pkg.discountedPrice ?? pkg.totalPrice ?? pkg.OriginalPrice ?? 0) || 0;
+    Number.parseFloat(
+      pkg.discountedPrice ?? pkg.DiscountedPrice ?? pkg.totalPrice ?? pkg.TotalPrice ?? totalPrice,
+    ) || 0;
   const savings = Math.max(0, Number.parseFloat((totalPrice - discountedPrice).toFixed(2)));
   const discountRate = totalPrice > 0 ? Math.max(0, Math.min(1, 1 - discountedPrice / totalPrice)) : 0;
   const discountPercent = Math.round(discountRate * 100);
@@ -529,13 +536,30 @@ function ServicesPage() {
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {displayedPackages.map((pkg) => {
               const packageItems = Array.isArray(pkg.items) ? pkg.items : [];
-              const totalPrice = packageItems.reduce(
+              const computedTotal = packageItems.reduce(
                 (sum, item) => sum + (Number.parseFloat(item.price ?? item.ItemPrice ?? 0) || 0),
                 0,
               );
-              const discountedPrice = Number.parseFloat(pkg.discountedPrice ?? pkg.totalPrice ?? 0) || 0;
+              const originalPrice =
+                Number.parseFloat(
+                  pkg.totalPrice ??
+                    pkg.originalPrice ??
+                    pkg.OriginalPrice ??
+                    pkg.TotalPrice ??
+                    computedTotal,
+                ) || 0;
+              const totalPrice = originalPrice > 0 ? originalPrice : computedTotal;
+              const discountedPrice =
+                Number.parseFloat(
+                  pkg.discountedPrice ??
+                    pkg.DiscountedPrice ??
+                    pkg.totalPrice ??
+                    pkg.TotalPrice ??
+                    totalPrice,
+                ) || 0;
               const savings = Math.max(0, Number.parseFloat((totalPrice - discountedPrice).toFixed(2)));
-              const discountRate = totalPrice > 0 ? Math.max(0, Math.min(1, 1 - discountedPrice / totalPrice)) : 0;
+              const discountRate =
+                totalPrice > 0 ? Math.max(0, Math.min(1, 1 - discountedPrice / totalPrice)) : 0;
               const discountPercent = Math.round(discountRate * 100);
               const packageId = pkg.id ?? pkg.PackageID;
               const orderForPackage = packageId ? purchasedPackageMap.get(String(packageId)) : null;
