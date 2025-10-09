@@ -4,7 +4,6 @@ import { useSiteSettings } from '../../../shared/context/SiteSettingsContext';
 import OverviewPanel from '../components/OverviewPanel';
 import DoctorApplicationsTab from '../components/DoctorApplicationsTab';
 import AboutContentTab from '../components/AboutContentTab';
-import ServicePackagesTab from '../components/ServicePackagesTab';
 import SiteSettingsTab from '../components/SiteSettingsTab';
 import HomeHeroTab from '../components/HomeHeroTab';
 import DoctorDirectoryTab from '../components/DoctorDirectoryTab';
@@ -14,7 +13,6 @@ const tabs = [
   { id: 'overview', label: 'Overview' },
   { id: 'doctor-applications', label: 'Doctor Applications' },
   { id: 'about', label: 'About Page' },
-  { id: 'packages', label: 'Service Packages' },
   { id: 'lab-reports', label: 'Lab Reports' },
   { id: 'home-hero', label: 'Homepage Hero' },
   { id: 'site-settings', label: 'Site Settings' },
@@ -40,7 +38,7 @@ function AdminDashboard() {
       <header className="text-center">
         <h1 className="text-3xl font-semibold text-slate-900">Admin Dashboard</h1>
         <p className="mt-2 text-slate-600">
-          Manage operations, site content, and promotional packages from a single workspace.
+          Manage operations, site content, and patient resources from a single workspace.
         </p>
       </header>
 
@@ -64,7 +62,6 @@ function AdminDashboard() {
       {activeTab === 'overview' ? <OverviewPanel token={auth.token} /> : null}
       {activeTab === 'doctor-applications' ? <DoctorApplicationsTab token={auth.token} /> : null}
       {activeTab === 'about' ? <AboutContentTab token={auth.token} /> : null}
-      {activeTab === 'packages' ? <ServicePackagesTab token={auth.token} /> : null}
       {activeTab === 'lab-reports' ? <LabReportsTab token={auth.token} /> : null}
       {activeTab === 'home-hero' ? <HomeHeroTab token={auth.token} /> : null}
       {activeTab === 'site-settings' ? (
