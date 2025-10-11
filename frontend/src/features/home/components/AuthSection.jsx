@@ -37,7 +37,7 @@ function AuthSection() {
           <button
             type="button"
             onClick={() => navigate('/signin/patient')}
-            className="mt-2 inline-flex items-center justify-center gap-2 self-start rounded-xl bg-brand-primary px-5 py-3 font-semibold text-white shadow-lg shadow-brand-primary/30 transition hover:-translate-y-0.5 hover:bg-blue-700"
+            className="mt-2 inline-flex items-center justify-center gap-2 self-start rounded-xl bg-brand-primary px-5 py-3 font-semibold text-white shadow-lg shadow-brand-primary/30 transition hover:-translate-y-0.5 hover:bg-brand-dark"
           >
             Sign in
             <FaArrowRight className="text-xs" />

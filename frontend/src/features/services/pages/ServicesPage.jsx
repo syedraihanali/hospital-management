@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { FaArrowLeft } from 'react-icons/fa';
 import { useSiteSettings } from '../../../shared/context/SiteSettingsContext';
+import ServiceCard from '../components/ServiceCard';
 
 function ServicesPage() {
   const { siteSettings } = useSiteSettings();
@@ -18,6 +19,10 @@ function ServicesPage() {
           We are curating a refreshed catalogue of wellness and diagnostic services for {siteName}. Check back
           shortly to explore new care packages tailored to your needs.
         </p>
+      </div>
+
+      <div className='grid grid-cols-1 md:grid-cols-2 gap-4 my-20'>
+        <ServiceCard/>
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-4">

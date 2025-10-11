@@ -110,11 +110,10 @@ function SignInPage() {
               <Link
                 key={roleKey}
                 to={`/signin/${roleKey}`}
-                className={`rounded-full px-3 py-1 transition ${
-                  roleKey === selectedRole
-                    ? 'bg-brand-primary text-white shadow'
-                    : 'bg-slate-100 text-slate-600 hover:bg-brand-secondary/80 hover:text-brand-dark'
-                }`}
+                className={`rounded-full px-3 py-1 transition ${roleKey === selectedRole
+                  ? 'bg-brand-primary text-white shadow'
+                  : 'bg-slate-100 text-slate-600 hover:bg-brand-secondary/80 hover:text-brand-dark'
+                  }`}
               >
                 {roleKey.charAt(0).toUpperCase() + roleKey.slice(1)}
               </Link>
@@ -150,7 +149,7 @@ function SignInPage() {
           )}
           <button
             type="submit"
-            className="w-full rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2"
+            className="w-full rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2"
           >
             Sign In
           </button>

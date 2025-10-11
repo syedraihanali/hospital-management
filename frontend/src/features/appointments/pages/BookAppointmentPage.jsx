@@ -433,8 +433,8 @@ function BookAppointmentPage() {
         method: 'POST',
         headers: auth.token
           ? {
-              Authorization: `Bearer ${auth.token}`,
-            }
+            Authorization: `Bearer ${auth.token}`,
+          }
           : undefined,
         body: formData,
       });
@@ -475,9 +475,8 @@ function BookAppointmentPage() {
           </p>
           {message.text ? (
             <div
-              className={`mt-4 rounded-xl border px-4 py-3 text-sm font-semibold ${
-                messageStyles[message.type] || 'border-slate-200 bg-slate-100 text-slate-700'
-              }`}
+              className={`mt-4 rounded-xl border px-4 py-3 text-sm font-semibold ${messageStyles[message.type] || 'border-slate-200 bg-slate-100 text-slate-700'
+                }`}
             >
               {message.text}
             </div>
@@ -686,7 +685,7 @@ function BookAppointmentPage() {
                     availabilityStatus === 'loading' ||
                     !selectedSlotId
                   }
-                  className="inline-flex items-center justify-center rounded-xl bg-brand-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-primary/30 transition hover:-translate-y-0.5 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2"
+                  className="inline-flex items-center justify-center rounded-xl bg-brand-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-primary/30 transition hover:-translate-y-0.5 hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2"
                 >
                   {submissionStatus === 'submitting' ? 'Reserving appointment…' : 'Reserve appointment'}
                 </button>

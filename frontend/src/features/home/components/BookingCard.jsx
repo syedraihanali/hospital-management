@@ -148,9 +148,8 @@ function BookingCard() {
 
       {message.text ? (
         <div
-          className={`mb-4 rounded-xl border px-3 py-2 text-xs font-semibold ${
-            messageStyles[message.type] || 'border-slate-200 bg-slate-100 text-slate-700'
-          }`}
+          className={`mb-4 rounded-xl border px-3 py-2 text-xs font-semibold ${messageStyles[message.type] || 'border-slate-200 bg-slate-100 text-slate-700'
+            }`}
         >
           {message.text}
         </div>
@@ -268,7 +267,7 @@ function BookingCard() {
 
         <button
           type="submit"
-          className="mt-2 inline-flex items-center justify-center rounded-2xl bg-brand-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-primary/30 transition hover:-translate-y-0.5 hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300"
+          className="mt-2 inline-flex items-center justify-center rounded-2xl bg-brand-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-primary/30 transition hover:-translate-y-0.5 hover:bg-brand-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300"
           disabled={availabilityStatus === 'loading' || !selectedSlotId}
         >
           {auth.token ? 'Proceed to checkout' : 'Continue to booking'}

@@ -7,7 +7,7 @@ function AppointmentCard({ appointments }) {
         <h3 className="text-xl font-semibold text-brand-primary">Upcoming Appointments</h3>
         <button
           type="button"
-          className="rounded-md bg-brand-primary px-3 py-1 text-sm font-semibold text-white shadow hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
+          className="rounded-md bg-brand-primary px-3 py-1 text-sm font-semibold text-white shadow hover:bg-brand-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
         >
           Book Now
         </button>
