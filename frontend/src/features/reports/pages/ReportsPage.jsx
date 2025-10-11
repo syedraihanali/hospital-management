@@ -15,6 +15,11 @@ function ReportsPage() {
   const [nidInput, setNidInput] = useState('');
   const [lookupStatus, setLookupStatus] = useState('idle');
   const [lookupError, setLookupError] = useState('');
+  const [hospitalOptions, setHospitalOptions] = useState([]);
+  const [hospitalResults, setHospitalResults] = useState({});
+  const [selectedHospitalSlug, setSelectedHospitalSlug] = useState('');
+  const [activeHospitalStatus, setActiveHospitalStatus] = useState('idle');
+  const [activeHospitalMessage, setActiveHospitalMessage] = useState('');
   const [patient, setPatient] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [labReports, setLabReports] = useState([]);
@@ -23,6 +28,71 @@ function ReportsPage() {
   const [assetsStatus, setAssetsStatus] = useState('idle');
   const [assetsError, setAssetsError] = useState('');
   const [appointmentAssets, setAppointmentAssets] = useState(null);
+
+  const activeHospital = useMemo(() => {
+    if (!hospitalOptions.length) {
+      return null;
+    }
+    if (selectedHospitalSlug) {
+      return (
+        hospitalOptions.find((hospital) => hospital.slug === selectedHospitalSlug) || hospitalOptions[0]
+      );
+    }
+    return hospitalOptions[0];
+  }, [hospitalOptions, selectedHospitalSlug]);
+
+  const applyHospitalResult = (result) => {
+    setSelectedAppointmentId('');
+    setAppointmentAssets(null);
+    setAssetsStatus('idle');
+    setAssetsError('');
+
+    if (result && result.status === 'succeeded' && result.patient) {
+      setPatient(result.patient);
+      setAppointments(Array.isArray(result.appointments) ? result.appointments : []);
+      setLabReports(Array.isArray(result.labReports) ? result.labReports : []);
+      setActiveHospitalStatus('succeeded');
+      setActiveHospitalMessage('');
+      return;
+    }
+
+    setPatient(null);
+    setAppointments([]);
+    setLabReports([]);
+
+    if (!result) {
+      setActiveHospitalStatus('not_found');
+      setActiveHospitalMessage('No records were located for this NID at the selected hospital.');
+      return;
+    }
+
+    if (result.status === 'failed') {
+      setActiveHospitalStatus('failed');
+      setActiveHospitalMessage(
+        result.message || 'The selected hospital is temporarily unavailable. Please try again later.'
+      );
+      return;
+    }
+
+    if (result.status === 'invalid') {
+      setActiveHospitalStatus('failed');
+      setActiveHospitalMessage(
+        result.message || 'The selected hospital could not process your request.'
+      );
+      return;
+    }
+
+    setActiveHospitalStatus('not_found');
+    setActiveHospitalMessage(
+      result.message || 'No records were located for this NID at the selected hospital.'
+    );
+  };
+
+  const handleHospitalChange = (event) => {
+    const slug = event.target.value;
+    setSelectedHospitalSlug(slug);
+    applyHospitalResult(hospitalResults[slug] ?? null);
+  };
 
   const handleLookup = async (event) => {
     event.preventDefault();
@@ -40,10 +110,18 @@ function ReportsPage() {
     setSelectedAppointmentId('');
     setAssetsStatus('idle');
     setLabReports([]);
+    setPatient(null);
+    setAppointments([]);
+    setHospitalOptions([]);
+    setHospitalResults({});
+    setSelectedHospitalSlug('');
+    setActiveHospitalStatus('idle');
+    setActiveHospitalMessage('');
+    setVerifiedNid('');
 
     try {
       const response = await fetch(
-        `${apiBaseUrl}/api/patient-access/appointments?nid=${encodeURIComponent(trimmedNid)}`
+        `${apiBaseUrl}/api/patient-access/appointments?nid=${encodeURIComponent(trimmedNid)}&hospital=all`
       );
       const data = await response.json();
 
@@ -51,18 +129,124 @@ function ReportsPage() {
         throw new Error(data.message || 'Unable to locate appointments for that NID number.');
       }
 
-      setLookupStatus('succeeded');
-      setPatient(data.patient);
-      setAppointments(Array.isArray(data.appointments) ? data.appointments : []);
+      if (Array.isArray(data?.results) && Array.isArray(data?.hospitals)) {
+        const orderedHospitals = [...data.hospitals]
+          .map((hospital) => ({
+            slug: hospital.slug,
+            name: hospital.name,
+            isPrimary: Boolean(hospital.isPrimary),
+            type: hospital.type || 'partner',
+          }))
+          .sort((a, b) => {
+            if (a.isPrimary !== b.isPrimary) {
+              return a.isPrimary ? -1 : 1;
+            }
+            return a.name.localeCompare(b.name);
+          });
+
+        const hospitalLookup = orderedHospitals.reduce((accumulator, hospital) => {
+          accumulator[hospital.slug] = hospital;
+          return accumulator;
+        }, {});
+
+        const resultsMap = {};
+        data.results.forEach((result) => {
+          const slug = result?.hospital?.slug;
+          if (!slug) {
+            return;
+          }
+          const descriptor = hospitalLookup[slug] || {};
+          const normalizedStatus = result?.status
+            ? result.status
+            : result?.patient
+            ? 'succeeded'
+            : 'not_found';
+
+          resultsMap[slug] = {
+            ...result,
+            status: normalizedStatus,
+            message: result?.message || '',
+            hospital: {
+              slug,
+              name: descriptor.name || result.hospital.name || slug,
+              isPrimary: Boolean(
+                descriptor.isPrimary ?? result.hospital.isPrimary ?? false
+              ),
+              type: descriptor.type || result.hospital.type || 'partner',
+            },
+            appointments: Array.isArray(result?.appointments) ? result.appointments : [],
+            labReports: Array.isArray(result?.labReports) ? result.labReports : [],
+          };
+        });
+
+        setHospitalOptions(orderedHospitals);
+        setHospitalResults(resultsMap);
+
+        let nextSlug =
+          selectedHospitalSlug && resultsMap[selectedHospitalSlug]
+            ? selectedHospitalSlug
+            : '';
+
+        if (!nextSlug) {
+          const primaryWithResult = orderedHospitals.find(
+            (hospital) => hospital.isPrimary && resultsMap[hospital.slug]
+          );
+          if (primaryWithResult) {
+            nextSlug = primaryWithResult.slug;
+          }
+        }
+
+        if (!nextSlug) {
+          const firstWithResult = orderedHospitals.find(
+            (hospital) => resultsMap[hospital.slug]
+          );
+          if (firstWithResult) {
+            nextSlug = firstWithResult.slug;
+          }
+        }
+
+        if (!nextSlug && orderedHospitals[0]) {
+          nextSlug = orderedHospitals[0].slug;
+        }
+
+        setSelectedHospitalSlug(nextSlug);
+        applyHospitalResult(resultsMap[nextSlug] ?? null);
+      } else {
+        const fallbackResult = {
+          status: data?.patient ? 'succeeded' : 'not_found',
+          message: data?.message || '',
+          patient: data?.patient || null,
+          appointments: Array.isArray(data?.appointments) ? data.appointments : [],
+          labReports: Array.isArray(data?.labReports) ? data.labReports : [],
+        };
+
+        const fallbackHospital = {
+          slug: 'primary-hospital',
+          name: 'Destination Health',
+          isPrimary: true,
+          type: 'local',
+        };
+
+        setHospitalOptions([fallbackHospital]);
+        setHospitalResults({ 'primary-hospital': fallbackResult });
+        setSelectedHospitalSlug('primary-hospital');
+        applyHospitalResult(fallbackResult);
+      }
+
       setVerifiedNid(trimmedNid);
-      setLabReports(Array.isArray(data.labReports) ? data.labReports : []);
+      setLookupStatus('succeeded');
     } catch (error) {
       setLookupStatus('failed');
+      setLookupError(error.message || 'Something went wrong while searching for appointments.');
       setPatient(null);
       setAppointments([]);
-      setVerifiedNid('');
       setLabReports([]);
-      setLookupError(error.message || 'Something went wrong while searching for appointments.');
+      setVerifiedNid('');
+      setHospitalOptions([]);
+      setHospitalResults({});
+      setSelectedHospitalSlug('');
+      setActiveHospitalStatus('failed');
+      setActiveHospitalMessage('');
     }
   };
 
@@ -80,8 +264,15 @@ function ReportsPage() {
     setAssetsStatus('loading');
 
     try {
+      const searchParams = new URLSearchParams({ nid: verifiedNid });
+      if (selectedHospitalSlug) {
+        searchParams.append('hospital', selectedHospitalSlug);
+      }
+
       const response = await fetch(
-        `${apiBaseUrl}/api/patient-access/appointments/${value}/assets?nid=${encodeURIComponent(verifiedNid)}`
+        `${apiBaseUrl}/api/patient-access/appointments/${encodeURIComponent(
+          value
+        )}/assets?${searchParams.toString()}`
       );
       const data = await response.json();
 
@@ -112,6 +303,11 @@ function ReportsPage() {
     setLookupStatus('idle');
     setAssetsStatus('idle');
     setLabReports([]);
+    setHospitalOptions([]);
+    setHospitalResults({});
+    setSelectedHospitalSlug('');
+    setActiveHospitalStatus('idle');
+    setActiveHospitalMessage('');
   };
 
   const selectedAppointment = useMemo(() => {
@@ -221,24 +417,90 @@ function ReportsPage() {
         </p>
       </section>
 
-      {patient ? (
+      {lookupStatus === 'succeeded' ? (
         <section className="space-y-8">
-          <div className="flex flex-col justify-between gap-4 rounded-3xl border border-emerald-100 bg-white/95 p-6 shadow-card sm:flex-row sm:items-center">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">Patient verified</p>
-              <h2 className="mt-1 text-2xl font-semibold text-brand-primary">{patient.fullName}</h2>
-              <dl className="mt-3 grid gap-1 text-sm text-slate-600 sm:grid-cols-2">
-                <div>
-                  <dt className="font-semibold text-slate-700">NID number</dt>
-                  <dd>{patient.nidNumber}</dd>
-                </div>
-                <div>
-                  <dt className="font-semibold text-slate-700">Contact</dt>
-                  <dd>{patient.phoneNumber || '—'}</dd>
-                </div>
-              </dl>
+          <div className="flex flex-col justify-between gap-6 rounded-3xl border border-emerald-100 bg-white/95 p-6 shadow-card sm:flex-row sm:items-start">
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center rounded-full bg-brand-secondary px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-primary">
+                  {activeHospitalStatus === 'succeeded' && patient
+                    ? 'Records available'
+                    : activeHospitalStatus === 'failed'
+                    ? 'Hospital unavailable'
+                    : 'No records found'}
+                </span>
+                {activeHospital?.isPrimary ? (
+                  <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold text-emerald-700">
+                    Primary network
+                  </span>
+                ) : activeHospital ? (
+                  <span className="inline-flex items-center rounded-full bg-sky-100 px-3 py-1 text-[11px] font-semibold text-sky-700">
+                    Partner hospital
+                  </span>
+                ) : null}
+              </div>
+              <h2 className="text-2xl font-semibold text-brand-primary">
+                {activeHospital?.name || 'Hospital records'}
+              </h2>
+              {activeHospitalStatus === 'succeeded' && patient ? (
+                <>
+                  <p className="text-sm text-slate-600">
+                    Records were retrieved for {patient.fullName}. Review their details below.
+                  </p>
+                  <dl className="mt-3 grid gap-1 text-sm text-slate-600 sm:grid-cols-2">
+                    <div>
+                      <dt className="font-semibold text-slate-700">NID number</dt>
+                      <dd>{patient.nidNumber}</dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-slate-700">Contact</dt>
+                      <dd>{patient.phoneNumber || '—'}</dd>
+                    </div>
+                  </dl>
+                </>
+              ) : (
+                <p className="text-sm text-slate-600">
+                  {activeHospitalMessage ||
+                    'No records were located for this NID at the selected hospital.'}
+                </p>
+              )}
             </div>
-            <div className="flex flex-col gap-3 sm:items-end">
+            <div className="flex w-full flex-col gap-3 sm:w-64 sm:items-end">
+              {hospitalOptions.length > 1 ? (
+                <div className="flex w-full flex-col gap-2">
+                  <label
+                    className="text-xs font-semibold uppercase tracking-wide text-slate-500"
+                    htmlFor="reports-hospital"
+                  >
+                    Switch hospital
+                  </label>
+                  <select
+                    id="reports-hospital"
+                    value={selectedHospitalSlug}
+                    onChange={handleHospitalChange}
+                    className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  >
+                    {hospitalOptions.map((hospital) => {
+                      const result = hospitalResults[hospital.slug];
+                      let optionStatus = 'Not checked';
+                      if (result) {
+                        if (result.status === 'succeeded' && result.patient) {
+                          optionStatus = 'Records found';
+                        } else if (result.status === 'failed' || result.status === 'invalid') {
+                          optionStatus = 'Unavailable';
+                        } else {
+                          optionStatus = 'No records';
+                        }
+                      }
+                      return (
+                        <option key={hospital.slug} value={hospital.slug}>
+                          {hospital.name} — {optionStatus}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              ) : null}
               <button
                 type="button"
                 onClick={resetLookup}
@@ -246,22 +508,33 @@ function ReportsPage() {
               >
                 Search another patient
               </button>
-              <Link
-                to="/medical-history"
-                className="inline-flex items-center justify-center rounded-full border border-brand-primary px-4 py-2 text-xs font-semibold text-brand-primary transition hover:bg-brand-primary hover:text-white"
-              >
-                View medical history
-              </Link>
+              {activeHospital?.isPrimary && patient ? (
+                <Link
+                  to="/medical-history"
+                  className="inline-flex items-center justify-center rounded-full border border-brand-primary px-4 py-2 text-xs font-semibold text-brand-primary transition hover:bg-brand-primary hover:text-white"
+                >
+                  View medical history
+                </Link>
+              ) : null}
             </div>
           </div>
 
+          {hospitalOptions.length > 1 ? (
+            <p className="text-xs text-slate-500">
+              Destination Health results appear first. Use the dropdown above to review records shared by partner hospitals.
+            </p>
+          ) : null}
+
+          {patient ? (
           <article className="space-y-4 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card">
             <header className="flex items-center gap-3">
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-secondary text-brand-primary">
                 <FaCalendarCheck aria-hidden="true" />
               </span>
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Select an appointment</h3>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Select an appointment from {activeHospital?.name || 'this hospital'}
+                </h3>
                 <p className="text-sm text-slate-600">Choose a visit to load associated doctor notes, prescriptions, and uploads.</p>
               </div>
             </header>
@@ -479,8 +752,7 @@ function ReportsPage() {
               </ul>
             ) : (
               <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-4 text-sm text-slate-500">
-                Lab reports will appear here once our administrators share them for this NID. Check back after your tests are
-                processed.
+                Lab reports will appear here once our administrators share them for this NID. Check back after your tests are processed.
               </p>
             )}
           </article>
@@ -493,8 +765,11 @@ function ReportsPage() {
               Visit the <Link to="/medical-history" className="font-semibold text-brand-primary underline">medical history page</Link> to browse every document linked to this NID, including prescriptions and lab results.
             </p>
           </div>
+          ) : null}
         </section>
       ) : null}
+
+
     </div>
   );
 }
