@@ -225,6 +225,7 @@ function normalizePackagePayload(payload = {}) {
     id: payload.id || payload.packageId || payload.PackageID || null,
     name: normalizeStrings(payload.name || payload.PackageName),
     subtitle: normalizeStrings(payload.subtitle || payload.Subtitle),
+    ribbonText: normalizeStrings(payload.ribbonText || payload.RibbonText),
     discountedPrice: Math.max(0, Number.parseFloat(payload.discountedPrice ?? payload.DiscountedPrice ?? 0) || 0),
     sortOrder: Number.parseInt(rawSortOrder, 10) || 0,
     items: sanitizedItems,
@@ -249,10 +250,11 @@ function transformPackageRow(row, packageItems) {
     id: row.PackageID,
     name: row.PackageName,
     subtitle: row.Subtitle || '',
+    ribbonText: row.RibbonText || '',
     totalPrice,
     originalPrice,
     discountedPrice: discounted,
-    savings: Number((totalPrice - discounted).toFixed(2)),
+    savings: Number((Math.max(totalPrice, originalPrice) - discounted).toFixed(2)),
     sortOrder: row.SortOrder,
     items: items.sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id),
   };
@@ -260,7 +262,7 @@ function transformPackageRow(row, packageItems) {
 
 async function getServicePackages() {
   const packages = await execute(
-    `SELECT PackageID, PackageName, Subtitle, OriginalPrice, DiscountedPrice, SortOrder
+    `SELECT PackageID, PackageName, Subtitle, RibbonText, OriginalPrice, DiscountedPrice, SortOrder
      FROM service_packages
      ORDER BY SortOrder ASC, PackageID ASC`
   );
@@ -326,7 +328,7 @@ async function getLabTests() {
 
 async function getServicePackageById(packageId) {
   const packages = await execute(
-    `SELECT PackageID, PackageName, Subtitle, OriginalPrice, DiscountedPrice, SortOrder
+    `SELECT PackageID, PackageName, Subtitle, RibbonText, OriginalPrice, DiscountedPrice, SortOrder
      FROM service_packages
      WHERE PackageID = ?`,
     [packageId]
@@ -369,6 +371,7 @@ async function createServicePackage(payload) {
     console.log('[ServicePackages] Creating package draft for persistence', {
       name: normalized.name,
       subtitle: normalized.subtitle,
+      ribbonText: normalized.ribbonText,
       discountedPrice: normalized.discountedPrice,
       sortOrder: normalized.sortOrder,
       totalPrice,
@@ -380,9 +383,16 @@ async function createServicePackage(payload) {
     });
 
     const [result] = await connection.execute(
-      `INSERT INTO service_packages (PackageName, Subtitle, OriginalPrice, DiscountedPrice, SortOrder)
-       VALUES (?, ?, ?, ?, ?)`,
-      [normalized.name, normalized.subtitle, totalPrice, normalized.discountedPrice, normalized.sortOrder]
+      `INSERT INTO service_packages (PackageName, Subtitle, RibbonText, OriginalPrice, DiscountedPrice, SortOrder)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        normalized.name,
+        normalized.subtitle,
+        normalized.ribbonText,
+        totalPrice,
+        normalized.discountedPrice,
+        normalized.sortOrder,
+      ]
     );
 
     const packageId = result.insertId;
@@ -448,9 +458,17 @@ async function updateServicePackage(packageId, payload) {
 
     await connection.execute(
       `UPDATE service_packages
-       SET PackageName = ?, Subtitle = ?, OriginalPrice = ?, DiscountedPrice = ?, SortOrder = ?
+       SET PackageName = ?, Subtitle = ?, RibbonText = ?, OriginalPrice = ?, DiscountedPrice = ?, SortOrder = ?
        WHERE PackageID = ?`,
-      [normalized.name, normalized.subtitle, totalPrice, normalized.discountedPrice, normalized.sortOrder, packageId]
+      [
+        normalized.name,
+        normalized.subtitle,
+        normalized.ribbonText,
+        totalPrice,
+        normalized.discountedPrice,
+        normalized.sortOrder,
+        packageId,
+      ]
     );
 
     const retainedIds = new Set();

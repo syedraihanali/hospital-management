@@ -105,6 +105,7 @@ CREATE TABLE IF NOT EXISTS service_packages (
     PackageID INT AUTO_INCREMENT PRIMARY KEY,
     PackageName VARCHAR(255) NOT NULL,
     Subtitle VARCHAR(255) NULL,
+    RibbonText VARCHAR(255) NULL,
     OriginalPrice DECIMAL(10,2) NOT NULL DEFAULT 0,
     DiscountedPrice DECIMAL(10,2) NOT NULL DEFAULT 0,
     SortOrder INT NOT NULL DEFAULT 0,

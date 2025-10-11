@@ -33,6 +33,7 @@ export const mapPackageResponseToForm = (pkg) => {
     id: pkg.id ?? pkg.PackageID ?? null,
     name: pkg.name ?? pkg.PackageName ?? '',
     subtitle: pkg.subtitle ?? pkg.Subtitle ?? '',
+    ribbonText: pkg.ribbonText ?? pkg.RibbonText ?? '',
     discountedPrice:
       resolvedDiscountedPrice === '' || resolvedDiscountedPrice === null
         ? ''

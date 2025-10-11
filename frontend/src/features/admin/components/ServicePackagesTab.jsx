@@ -137,6 +137,7 @@ function ServicePackagesTab({ token }) {
     return {
       name: (pkg.name || '').trim(),
       subtitle: (pkg.subtitle || '').trim(),
+      ribbonText: (pkg.ribbonText || '').trim(),
       discountedPrice: (() => {
         const parsed = Number.parseFloat(pkg.discountedPrice);
         return Number.isNaN(parsed) ? 0 : Math.max(0, parsed);
