@@ -8,12 +8,14 @@ import SiteSettingsTab from '../components/SiteSettingsTab';
 import HomeHeroTab from '../components/HomeHeroTab';
 import DoctorDirectoryTab from '../components/DoctorDirectoryTab';
 import LabReportsTab from '../components/LabReportsTab';
+import ServicePackagesTab from '../components/ServicePackagesTab';
 
 const tabs = [
   { id: 'overview', label: 'Overview' },
   { id: 'doctor-applications', label: 'Doctor Applications' },
   { id: 'about', label: 'About Page' },
   { id: 'lab-reports', label: 'Lab Reports' },
+  { id: 'service-packages', label: 'Service Packages' },
   { id: 'home-hero', label: 'Homepage Hero' },
   { id: 'site-settings', label: 'Site Settings' },
   { id: 'doctor-directory', label: 'Doctor Directory' },
@@ -64,6 +66,7 @@ function AdminDashboard() {
       {activeTab === 'about' ? <AboutContentTab token={auth.token} /> : null}
       {activeTab === 'lab-reports' ? <LabReportsTab token={auth.token} /> : null}
       {activeTab === 'home-hero' ? <HomeHeroTab token={auth.token} /> : null}
+      {activeTab === 'service-packages' ? <ServicePackagesTab token={auth.token} /> : null}
       {activeTab === 'site-settings' ? (
         <SiteSettingsTab
           token={auth.token}
