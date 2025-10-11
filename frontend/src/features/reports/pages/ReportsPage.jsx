@@ -526,245 +526,247 @@ function ReportsPage() {
           ) : null}
 
           {patient ? (
-          <article className="space-y-4 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card">
-            <header className="flex items-center gap-3">
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-secondary text-brand-primary">
-                <FaCalendarCheck aria-hidden="true" />
-              </span>
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">
-                  Select an appointment from {activeHospital?.name || 'this hospital'}
-                </h3>
-                <p className="text-sm text-slate-600">Choose a visit to load associated doctor notes, prescriptions, and uploads.</p>
-              </div>
-            </header>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <select
-                value={selectedAppointmentId}
-                onChange={handleAppointmentChange}
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent sm:max-w-md"
-              >
-                <option value="">-- Choose appointment --</option>
-                {appointments.map((appointment) => (
-                  <option key={appointment.AppointmentID} value={appointment.AppointmentID}>
-                    {formatDate(appointment.ScheduleDate)} · {appointment.DoctorName}
-                  </option>
-                ))}
-              </select>
-              {appointments.length === 0 ? (
-                <p className="text-sm text-slate-500">
-                  No appointments found yet. Book a consultation first to receive reports.
-                </p>
-              ) : null}
-            </div>
-            {assetsError ? <p className="text-sm font-medium text-rose-600">{assetsError}</p> : null}
-          </article>
-
-          {assetsStatus === 'loading' ? (
-            <div className="rounded-3xl border border-slate-200 bg-white/80 p-6 text-sm text-slate-600 shadow-card">
-              Loading appointment details…
-            </div>
-          ) : null}
-
-          {selectedAppointment && assetsStatus === 'succeeded' ? (
-            <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
-              <article className="space-y-4 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card">
-                <header className="flex items-center gap-3">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-100 text-sky-600">
-                    <FaInfoCircle aria-hidden="true" />
-                  </span>
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">Appointment summary</h3>
-                    <p className="text-sm text-slate-600">Review the key details for this visit.</p>
-                  </div>
-                </header>
-                <dl className="grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
-                  <div>
-                    <dt className="font-semibold text-slate-600">Doctor</dt>
-                    <dd>{selectedAppointment.DoctorName}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-semibold text-slate-600">Status</dt>
-                    <dd className="capitalize">{selectedAppointment.Status || 'pending'}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-semibold text-slate-600">Date</dt>
-                    <dd>{formatDate(selectedAppointment.ScheduleDate)}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-semibold text-slate-600">Time</dt>
-                    <dd>
-                      {formatTime(selectedAppointment.StartTime)} – {formatTime(selectedAppointment.EndTime)}
-                    </dd>
-                  </div>
-                </dl>
-                {selectedAppointment.Notes ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-600">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Doctor notes</p>
-                    <p className="mt-1 whitespace-pre-line text-sm">{selectedAppointment.Notes}</p>
-                  </div>
-                ) : null}
-              </article>
-
+            <>
               <article className="space-y-4 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card">
                 <header className="flex items-center gap-3">
                   <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-secondary text-brand-primary">
-                    <FaFileMedical aria-hidden="true" />
+                    <FaCalendarCheck aria-hidden="true" />
                   </span>
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-900">Documents & prescriptions</h3>
-                    <p className="text-sm text-slate-600">Files uploaded specifically for this visit.</p>
+                    <h3 className="text-lg font-semibold text-slate-900">
+                      Select an appointment from {activeHospital?.name || 'this hospital'}
+                    </h3>
+                    <p className="text-sm text-slate-600">Choose a visit to load associated doctor notes, prescriptions, and uploads.</p>
                   </div>
                 </header>
-                {appointmentAssets.documents?.length ? (
-                  <ul className="grid gap-3 text-sm text-slate-700">
-                    {appointmentAssets.documents.map((document) => (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <select
+                    value={selectedAppointmentId}
+                    onChange={handleAppointmentChange}
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent sm:max-w-md"
+                  >
+                    <option value="">-- Choose appointment --</option>
+                    {appointments.map((appointment) => (
+                      <option key={appointment.AppointmentID} value={appointment.AppointmentID}>
+                        {formatDate(appointment.ScheduleDate)} · {appointment.DoctorName}
+                      </option>
+                    ))}
+                  </select>
+                  {appointments.length === 0 ? (
+                    <p className="text-sm text-slate-500">
+                      No appointments found yet. Book a consultation first to receive reports.
+                    </p>
+                  ) : null}
+                </div>
+                {assetsError ? <p className="text-sm font-medium text-rose-600">{assetsError}</p> : null}
+              </article>
+
+              {assetsStatus === 'loading' ? (
+                <div className="rounded-3xl border border-slate-200 bg-white/80 p-6 text-sm text-slate-600 shadow-card">
+                  Loading appointment details…
+                </div>
+              ) : null}
+
+              {selectedAppointment && assetsStatus === 'succeeded' ? (
+                <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+                  <article className="space-y-4 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card">
+                    <header className="flex items-center gap-3">
+                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-100 text-sky-600">
+                        <FaInfoCircle aria-hidden="true" />
+                      </span>
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900">Appointment summary</h3>
+                        <p className="text-sm text-slate-600">Review the key details for this visit.</p>
+                      </div>
+                    </header>
+                    <dl className="grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
+                      <div>
+                        <dt className="font-semibold text-slate-600">Doctor</dt>
+                        <dd>{selectedAppointment.DoctorName}</dd>
+                      </div>
+                      <div>
+                        <dt className="font-semibold text-slate-600">Status</dt>
+                        <dd className="capitalize">{selectedAppointment.Status || 'pending'}</dd>
+                      </div>
+                      <div>
+                        <dt className="font-semibold text-slate-600">Date</dt>
+                        <dd>{formatDate(selectedAppointment.ScheduleDate)}</dd>
+                      </div>
+                      <div>
+                        <dt className="font-semibold text-slate-600">Time</dt>
+                        <dd>
+                          {formatTime(selectedAppointment.StartTime)} – {formatTime(selectedAppointment.EndTime)}
+                        </dd>
+                      </div>
+                    </dl>
+                    {selectedAppointment.Notes ? (
+                      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-600">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Doctor notes</p>
+                        <p className="mt-1 whitespace-pre-line text-sm">{selectedAppointment.Notes}</p>
+                      </div>
+                    ) : null}
+                  </article>
+
+                  <article className="space-y-4 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card">
+                    <header className="flex items-center gap-3">
+                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-secondary text-brand-primary">
+                        <FaFileMedical aria-hidden="true" />
+                      </span>
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900">Documents & prescriptions</h3>
+                        <p className="text-sm text-slate-600">Files uploaded specifically for this visit.</p>
+                      </div>
+                    </header>
+                    {appointmentAssets.documents?.length ? (
+                      <ul className="grid gap-3 text-sm text-slate-700">
+                        {appointmentAssets.documents.map((document) => (
+                          <li
+                            key={document.DocumentID}
+                            className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm"
+                          >
+                            <div className="flex flex-col gap-1">
+                              <p className="font-semibold text-slate-900">{document.DocumentName}</p>
+                              <p className="text-xs text-slate-500">Uploaded {formatDateTime(document.UploadedAt)}</p>
+                            </div>
+                            <a
+                              href={document.FileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center rounded-full border border-brand-primary px-4 py-2 text-xs font-semibold text-brand-primary transition hover:bg-brand-primary hover:text-white"
+                            >
+                              View document
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-slate-500">No additional documents were shared for this appointment.</p>
+                    )}
+                  </article>
+                </div>
+              ) : null}
+
+              {appointmentAssets?.doctorReports?.length ? (
+                <article className="space-y-4 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card">
+                  <header className="flex items-center gap-3">
+                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-100 text-sky-600">
+                      <FaNotesMedical aria-hidden="true" />
+                    </span>
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-900">Doctor reports</h3>
+                      <p className="text-sm text-slate-600">Download the official consultation notes prepared by your doctor.</p>
+                    </div>
+                  </header>
+                  <ul className="grid gap-3">
+                    {appointmentAssets.doctorReports.map((report) => (
                       <li
-                        key={document.DocumentID}
-                        className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm"
+                        key={report.ReportID}
+                        className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white/90 p-4 text-sm text-slate-700 shadow-sm"
                       >
-                        <div className="flex flex-col gap-1">
-                          <p className="font-semibold text-slate-900">{document.DocumentName}</p>
-                          <p className="text-xs text-slate-500">Uploaded {formatDateTime(document.UploadedAt)}</p>
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="font-semibold text-slate-900">{report.Title}</p>
+                            <p className="text-xs text-slate-500">
+                              {report.DoctorName ? `By ${report.DoctorName}` : 'Doctor report'} · {formatDateTime(report.CreatedAt)}
+                            </p>
+                          </div>
+                          <a
+                            href={report.FileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center rounded-full border border-brand-primary px-4 py-2 text-xs font-semibold text-brand-primary transition hover:bg-brand-primary hover:text-white"
+                          >
+                            Download report
+                          </a>
                         </div>
-                        <a
-                          href={document.FileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center rounded-full border border-brand-primary px-4 py-2 text-xs font-semibold text-brand-primary transition hover:bg-brand-primary hover:text-white"
-                        >
-                          View document
-                        </a>
+                        {report.Description ? (
+                          <p className="text-xs text-slate-600">{report.Description}</p>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </article>
+              ) : null}
+
+              {appointmentAssets && !appointmentAssets.doctorReports?.length && assetsStatus === 'succeeded' ? (
+                <div className="rounded-3xl border border-dashed border-slate-300 bg-white/70 p-6 text-sm text-slate-500">
+                  No doctor reports were attached to this appointment. Contact your provider if you were expecting one.
+                </div>
+              ) : null}
+
+              <article className="space-y-4 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card">
+                <header className="flex items-center gap-3">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                    <FaFlask aria-hidden="true" />
+                  </span>
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">Lab reports shared by admin</h3>
+                    <p className="text-sm text-slate-600">Track diagnostic files, applied package discounts, and final charges.</p>
+                  </div>
+                </header>
+                {labReports.length ? (
+                  <ul className="grid gap-3">
+                    {labReports.map((report) => (
+                      <li
+                        key={report.LabReportID ?? report.ReportID ?? report.Title}
+                        className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/90 p-4 text-sm text-slate-700 shadow-sm"
+                      >
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="font-semibold text-slate-900">{report.Title}</p>
+                            <p className="text-xs text-slate-500">
+                              {report.TestName ? `${report.TestName} · ` : ''}
+                              Shared {formatDateTime(report.CreatedAt)} by {report.AdminName || 'Administrator'}
+                            </p>
+                          </div>
+                          <a
+                            href={report.FileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center rounded-full border border-brand-primary px-4 py-2 text-xs font-semibold text-brand-primary transition hover:bg-brand-primary hover:text-white"
+                          >
+                            Download report
+                          </a>
+                        </div>
+                        <div className="grid gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-600 sm:grid-cols-3">
+                          <div>
+                            <p className="font-semibold text-slate-700">Base charge</p>
+                            <p className="text-sm text-brand-primary">{formatCurrency(report.BaseCharge)}</p>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-700">Package discount</p>
+                            <p className="text-sm text-emerald-600">{formatCurrency(report.DiscountAmount)}</p>
+                            {report.PackageName ? (
+                              <p className="text-[11px] text-slate-500">{report.PackageName}</p>
+                            ) : null}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-700">Final payable</p>
+                            <p className="text-sm text-brand-dark">{formatCurrency(report.FinalCharge)}</p>
+                          </div>
+                        </div>
+                        {report.Description ? (
+                          <p className="text-xs text-slate-600">{report.Description}</p>
+                        ) : null}
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-slate-500">No additional documents were shared for this appointment.</p>
+                  <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-4 text-sm text-slate-500">
+                    Lab reports will appear here once our administrators share them for this NID. Check back after your tests are processed.
+                  </p>
                 )}
               </article>
-            </div>
-          ) : null}
 
-          {appointmentAssets?.doctorReports?.length ? (
-            <article className="space-y-4 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card">
-              <header className="flex items-center gap-3">
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-100 text-sky-600">
-                  <FaNotesMedical aria-hidden="true" />
-                </span>
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Doctor reports</h3>
-                  <p className="text-sm text-slate-600">Download the official consultation notes prepared by your doctor.</p>
-                </div>
-              </header>
-              <ul className="grid gap-3">
-                {appointmentAssets.doctorReports.map((report) => (
-                  <li
-                    key={report.ReportID}
-                    className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white/90 p-4 text-sm text-slate-700 shadow-sm"
-                  >
-                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="font-semibold text-slate-900">{report.Title}</p>
-                        <p className="text-xs text-slate-500">
-                          {report.DoctorName ? `By ${report.DoctorName}` : 'Doctor report'} · {formatDateTime(report.CreatedAt)}
-                        </p>
-                      </div>
-                      <a
-                        href={report.FileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center rounded-full border border-brand-primary px-4 py-2 text-xs font-semibold text-brand-primary transition hover:bg-brand-primary hover:text-white"
-                      >
-                        Download report
-                      </a>
-                    </div>
-                    {report.Description ? (
-                      <p className="text-xs text-slate-600">{report.Description}</p>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            </article>
-          ) : null}
-
-          {appointmentAssets && !appointmentAssets.doctorReports?.length && assetsStatus === 'succeeded' ? (
-            <div className="rounded-3xl border border-dashed border-slate-300 bg-white/70 p-6 text-sm text-slate-500">
-              No doctor reports were attached to this appointment. Contact your provider if you were expecting one.
-            </div>
-          ) : null}
-
-          <article className="space-y-4 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card">
-            <header className="flex items-center gap-3">
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                <FaFlask aria-hidden="true" />
-              </span>
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">Lab reports shared by admin</h3>
-                <p className="text-sm text-slate-600">Track diagnostic files, applied package discounts, and final charges.</p>
+              <div className="rounded-3xl border border-emerald-100 bg-emerald-50/80 p-6 text-sm text-emerald-700">
+                <p className="flex items-center gap-2 font-semibold">
+                  <FaUserCheck aria-hidden="true" /> Need older records?
+                </p>
+                <p className="mt-1 text-sm">
+                  Visit the <Link to="/medical-history" className="font-semibold text-brand-primary underline">medical history page</Link> to browse every document linked to this NID, including prescriptions and lab results.
+                </p>
               </div>
-            </header>
-            {labReports.length ? (
-              <ul className="grid gap-3">
-                {labReports.map((report) => (
-                  <li
-                    key={report.LabReportID ?? report.ReportID ?? report.Title}
-                    className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/90 p-4 text-sm text-slate-700 shadow-sm"
-                  >
-                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="font-semibold text-slate-900">{report.Title}</p>
-                        <p className="text-xs text-slate-500">
-                          {report.TestName ? `${report.TestName} · ` : ''}
-                          Shared {formatDateTime(report.CreatedAt)} by {report.AdminName || 'Administrator'}
-                        </p>
-                      </div>
-                      <a
-                        href={report.FileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center rounded-full border border-brand-primary px-4 py-2 text-xs font-semibold text-brand-primary transition hover:bg-brand-primary hover:text-white"
-                      >
-                        Download report
-                      </a>
-                    </div>
-                    <div className="grid gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-600 sm:grid-cols-3">
-                      <div>
-                        <p className="font-semibold text-slate-700">Base charge</p>
-                        <p className="text-sm text-brand-primary">{formatCurrency(report.BaseCharge)}</p>
-                      </div>
-                      <div>
-                        <p className="font-semibold text-slate-700">Package discount</p>
-                        <p className="text-sm text-emerald-600">{formatCurrency(report.DiscountAmount)}</p>
-                        {report.PackageName ? (
-                          <p className="text-[11px] text-slate-500">{report.PackageName}</p>
-                        ) : null}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-slate-700">Final payable</p>
-                        <p className="text-sm text-brand-dark">{formatCurrency(report.FinalCharge)}</p>
-                      </div>
-                    </div>
-                    {report.Description ? (
-                      <p className="text-xs text-slate-600">{report.Description}</p>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-4 text-sm text-slate-500">
-                Lab reports will appear here once our administrators share them for this NID. Check back after your tests are processed.
-              </p>
-            )}
-          </article>
-
-          <div className="rounded-3xl border border-emerald-100 bg-emerald-50/80 p-6 text-sm text-emerald-700">
-            <p className="flex items-center gap-2 font-semibold">
-              <FaUserCheck aria-hidden="true" /> Need older records?
-            </p>
-            <p className="mt-1 text-sm">
-              Visit the <Link to="/medical-history" className="font-semibold text-brand-primary underline">medical history page</Link> to browse every document linked to this NID, including prescriptions and lab results.
-            </p>
-          </div>
+            </>
           ) : null}
         </section>
       ) : null}
