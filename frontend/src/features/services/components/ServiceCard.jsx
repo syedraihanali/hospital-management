@@ -1,87 +1,88 @@
-import React from "react";
+import React from 'react';
 
-// JSON data
-const packageData = {
-  id: 1,
-  name: "Package-1",
-  ribbon: {
-    saveAmount: "1,810",
-    text: "SAVE BDT 1,810"
-  },
-  services: [
-    { id: 1, name: "Complete Blood Count (CBC)", price: "400.00" },
-    { id: 2, name: "Random Blood Sugar", price: "200.00" },
-    { id: 3, name: "Lipid Profile (Random)", price: "1,400.00" },
-    { id: 4, name: "Blood Grouping & RH Factor", price: "300.00" },
-    { id: 5, name: "Serum Creatinine", price: "400.00" },
-    { id: 6, name: "HBsAg", price: "1,000.00" },
-    { id: 7, name: "Urine R/E", price: "400.00" },
-    { id: 8, name: "ECG", price: "400.00" },
-    { id: 9, name: "Digital X-Ray of Chest P/A View (Digital)", price: "600.00" },
-    { id: 10, name: "Ultrasonography of Whole Abdomen", price: "2,500.00" },
-    { id: 11, name: "Needle, Tube & Reg. Charges", price: "110.00" }
-  ],
-  pricing: {
-    totalCost: "7,710.00",
-    discountedPrice: "5,900.00"
+function formatCurrency(value) {
+  const numeric = Number.parseFloat(value);
+  if (Number.isNaN(numeric)) {
+    return 'BDT 0.00';
   }
-};
 
-export default function ServiceCard() {
+  return `BDT ${numeric.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function ServiceCard({ packageData, onPurchase, actionLabel = 'Purchase package', disabled = false }) {
+  const items = Array.isArray(packageData?.items) ? packageData.items : [];
+  const originalPrice = Number.parseFloat(packageData?.originalPrice ?? packageData?.totalPrice ?? 0) || 0;
+  const discountedPrice = Number.parseFloat(packageData?.discountedPrice ?? 0) || 0;
+  const savings = Math.max(0, Number.parseFloat(packageData?.savings ?? originalPrice - discountedPrice) || 0);
+  const hasDiscount = savings > 0.009;
+
   return (
-    <div className="relative rounded-2xl shadow-md p-6 max-w-2xl mx-auto font-[Poppins] overflow-hidden">
-      {/* Enhanced Professional Ribbon */}
-      <div className="absolute top-9 -left-14">
-        <div className="relative">
-          <div className="bg-brand-primary text-white font-semibold px-12 py-3.5 shadow-lg transform -rotate-45 flex items-center justify-center gap-1">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clipRule="evenodd" />
-            </svg>
-            <span className="text-sm tracking-wide">{packageData.ribbon.text}</span>
-          </div>
-          {/* Ribbon tail for premium look */}
-          <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-t-[8px] border-t-green-700 border-r-[6px] border-r-transparent"></div>
+    <article className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-card transition hover:shadow-xl">
+      {hasDiscount ? (
+        <div className="absolute left-[-3.75rem] top-8 rotate-[-45deg] bg-brand-primary px-12 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-lg">
+          Save {formatCurrency(savings)}
         </div>
-      </div>
+      ) : null}
 
-      {/* Title */}
-      <div className="mt-8 mb-4 flex justify-center">
-        <span className="text-2xl font-semibold text-gray-800 tracking-wide">
-          {packageData.name}
-        </span>
-      </div>
+      <header className="mb-4 flex flex-col items-center gap-2 text-center">
+        <h3 className="text-2xl font-semibold text-slate-900">{packageData?.name || 'Service package'}</h3>
+        {packageData?.subtitle ? (
+          <p className="text-sm text-slate-600">{packageData.subtitle}</p>
+        ) : null}
+      </header>
 
-      {/* Table */}
-      <div className="rounded-xl overflow-hidden">
-        <table className="w-full text-gray-600 text-[16px] font-medium">
+      <div className="flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <table className="w-full text-left text-sm text-slate-700">
           <tbody>
-            {packageData.services.map((service) => (
-              <tr key={service.id}>
-                <td className="text-start px-5 py-2">{service.name}</td>
-                <td className="text-right px-5 py-2">BDT {service.price}</td>
+            {items.length ? (
+              items.map((service) => (
+                <tr key={service.id ?? service.name} className="border-b border-slate-100 last:border-0">
+                  <td className="px-5 py-3 font-medium text-slate-700">{service.name}</td>
+                  <td className="px-5 py-3 text-right text-slate-500">{formatCurrency(service.price)}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td className="px-5 py-4 text-center text-slate-500" colSpan={2}>
+                  Package items will appear here once published.
+                </td>
               </tr>
-            ))}
-            <tr>
-              <td colSpan={2}>
-                <hr className="my-2 border-gray-200" />
-              </td>
-            </tr>
-            <tr>
-              <td className="px-5 py-2 font-medium text-gray-600">Total Cost:</td>
-              <td className="text-right px-5 py-2 text-gray-600">BDT {packageData.pricing.totalCost}</td>
-            </tr>
-            <tr>
-              <td className="px-5 py-2 font-medium text-gray-600">Discounted Price:</td>
-              <td className="text-right px-5 py-2 font-bold text-blue-900 text-lg">
-                BDT {packageData.pricing.discountedPrice}
-              </td>
-            </tr>
+            )}
           </tbody>
         </table>
-        <button className="hover:bg-brand-dark rounded-full px-12 bg-brand-primary py-2.5 text-white font-medium">
-          Book Now
-        </button>
       </div>
-    </div>
+
+      <footer className="mt-5 flex flex-col gap-4">
+        <div className="grid gap-3 rounded-2xl bg-slate-50 px-5 py-4 text-sm text-slate-600 sm:grid-cols-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tests value</p>
+            <p className="text-base font-semibold text-slate-900">{formatCurrency(originalPrice)}</p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">You pay</p>
+            <p className="text-base font-semibold text-brand-primary">{formatCurrency(discountedPrice)}</p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">You save</p>
+            <p className="text-base font-semibold text-emerald-600">{formatCurrency(savings)}</p>
+          </div>
+        </div>
+        {onPurchase ? (
+          <button
+            type="button"
+            onClick={() => onPurchase(packageData)}
+            disabled={disabled}
+            className="inline-flex items-center justify-center rounded-full bg-brand-primary px-8 py-2.5 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-slate-400"
+          >
+            {actionLabel}
+          </button>
+        ) : null}
+      </footer>
+    </article>
   );
 }
+
+export default ServiceCard;
