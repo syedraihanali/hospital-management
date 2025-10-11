@@ -148,7 +148,11 @@ function PatientProfile() {
   }, [appointmentHistory, searchTerm, sortOrder]);
 
   const recentPackages = useMemo(() => {
-    return (packageOrders || [])
+    const activeOrders = (packageOrders || []).filter((order) =>
+      order?.isActive === undefined ? true : Boolean(order.isActive)
+    );
+
+    return activeOrders
       .map((order) => {
         const original = Number.parseFloat(order.originalPrice ?? order.OriginalPrice ?? 0) || 0;
         const discounted = Number.parseFloat(order.discountedPrice ?? order.DiscountedPrice ?? 0) || 0;
@@ -167,7 +171,7 @@ function PatientProfile() {
           status: order.status || 'pending',
         };
       })
-      .slice(0, 4);
+      .slice(0, 1);
   }, [packageOrders]);
 
   const recentLabReports = useMemo(() => {
@@ -532,9 +536,9 @@ function PatientProfile() {
       <section className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-card backdrop-blur">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-brand-primary">Your lab packages</h2>
+            <h2 className="text-xl font-semibold text-brand-primary">Your active lab package</h2>
             <p className="text-sm text-slate-600">
-              Track recent package purchases and the savings applied to your reports.
+              Track the package currently linked to your lab reports and the savings applied automatically.
             </p>
           </div>
           <Link

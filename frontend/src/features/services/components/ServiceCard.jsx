@@ -66,7 +66,7 @@ export default function ServiceCard({ packageData, onBook }) {
   }, [ribbonText, savings]);
 
   return (
-    <div className="relative rounded-2xl shadow-md p-6 w-full font-[Poppins] overflow-hidden bg-white">
+    <div className="relative w-full overflow-hidden rounded-2xl bg-white p-6 font-sans shadow-md">
       {resolvedRibbonText ? (
         <div className="absolute top-9 -left-14" aria-hidden="true">
           <div className="relative">
@@ -85,20 +85,20 @@ export default function ServiceCard({ packageData, onBook }) {
         </div>
       ) : null}
 
-      <div className="mt-8 mb-4 text-center space-y-1">
-        <span className="text-2xl font-semibold text-gray-800 tracking-wide block">{name}</span>
-        {subtitle ? <p className="text-sm text-gray-500">{subtitle}</p> : null}
+      <div className="mt-8 mb-4 space-y-1 text-center">
+        <span className="block text-2xl font-semibold tracking-tight text-slate-900">{name}</span>
+        {subtitle ? <p className="text-sm text-slate-500">{subtitle}</p> : null}
       </div>
 
       <div className="rounded-xl overflow-hidden">
-        <table className="w-full text-gray-600 text-[16px] font-medium">
+        <table className="w-full text-sm font-medium text-slate-600">
           <tbody>
             {items.map((service) => {
               const price = Number.parseFloat(service.price);
               return (
                 <tr key={service.id || service.PackageItemID || service.name}>
-                  <td className="text-start px-5 py-2 align-top">{service.name}</td>
-                  <td className="text-right px-5 py-2 whitespace-nowrap">
+                  <td className="px-5 py-2 text-left align-top text-slate-700">{service.name}</td>
+                  <td className="whitespace-nowrap px-5 py-2 text-right text-slate-700">
                     BDT {formatCurrency(Number.isNaN(price) ? 0 : price)}
                   </td>
                 </tr>
@@ -110,12 +110,12 @@ export default function ServiceCard({ packageData, onBook }) {
               </td>
             </tr>
             <tr>
-              <td className="px-5 py-2 font-medium text-gray-600">Total Cost:</td>
-              <td className="text-right px-5 py-2 text-gray-600">BDT {formatCurrency(totalCost)}</td>
+              <td className="px-5 py-2 font-semibold text-slate-600">Total Cost:</td>
+              <td className="px-5 py-2 text-right text-slate-600">BDT {formatCurrency(totalCost)}</td>
             </tr>
             <tr>
-              <td className="px-5 py-2 font-medium text-gray-600">Discounted Price:</td>
-              <td className="text-right px-5 py-2 font-bold text-blue-900 text-lg">
+              <td className="px-5 py-2 font-semibold text-slate-600">Discounted Price:</td>
+              <td className="px-5 py-2 text-right text-lg font-semibold text-brand-primary">
                 BDT {formatCurrency(resolvedDiscountedPrice)}
               </td>
             </tr>
@@ -123,14 +123,14 @@ export default function ServiceCard({ packageData, onBook }) {
         </table>
         <button
           type="button"
-          className="mt-4 hover:bg-brand-dark rounded-full px-12 bg-brand-primary py-2.5 text-white font-medium transition-colors"
+          className="mt-4 rounded-full bg-brand-primary px-12 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark"
           onClick={() => {
             if (typeof onBook === 'function') {
               onBook(packageData);
             }
           }}
         >
-          Book Now
+          Purchase package
         </button>
       </div>
     </div>

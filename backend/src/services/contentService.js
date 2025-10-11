@@ -575,26 +575,32 @@ async function createServicePackageOrder(packageId, payload = {}) {
     savings,
   });
 
-  const result = await execute(
-    `INSERT INTO package_orders
-      (PackageID, PatientID, FullName, Email, PhoneNumber, NidNumber, Notes, OriginalPrice, DiscountedPrice, Savings, Status, PackageSnapshot)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
-    [
-      servicePackage.id,
-      normalizedPatientId,
-      sanitized.fullName,
-      sanitized.email,
-      sanitized.phoneNumber,
-      sanitized.nidNumber || null,
-      sanitized.notes || null,
-      originalPrice,
-      discountedPrice,
-      savings,
-      snapshot,
-    ]
-  );
+  const orderId = await transaction(async (connection) => {
+    if (normalizedPatientId) {
+      await connection.execute('UPDATE package_orders SET IsActive = 0 WHERE PatientID = ?', [normalizedPatientId]);
+    }
 
-  const orderId = result.insertId;
+    const [result] = await connection.execute(
+      `INSERT INTO package_orders
+        (PackageID, PatientID, FullName, Email, PhoneNumber, NidNumber, Notes, OriginalPrice, DiscountedPrice, Savings, Status, PackageSnapshot, IsActive)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 1)`,
+      [
+        servicePackage.id,
+        normalizedPatientId,
+        sanitized.fullName,
+        sanitized.email,
+        sanitized.phoneNumber,
+        sanitized.nidNumber || null,
+        sanitized.notes || null,
+        originalPrice,
+        discountedPrice,
+        savings,
+        snapshot,
+      ]
+    );
+
+    return result.insertId;
+  });
 
   return {
     message: 'Package purchase request submitted successfully.',

@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import ServiceCard from '../components/ServiceCard';
+import { AuthContext } from '../../auth/context/AuthContext';
 
 const apiBaseUrl = process.env.REACT_APP_API_URL;
 
@@ -88,6 +89,22 @@ function ServicesPage() {
   const [packages, setPackages] = useState([]);
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState('');
+  const { auth } = useContext(AuthContext);
+  const [selectedPackage, setSelectedPackage] = useState(null);
+  const [purchaseForm, setPurchaseForm] = useState({
+    fullName: '',
+    email: '',
+    phoneNumber: '',
+    nidNumber: '',
+    notes: '',
+  });
+  const [purchaseStatus, setPurchaseStatus] = useState('idle');
+  const [purchaseFeedback, setPurchaseFeedback] = useState('');
+
+  const formatCurrency = useCallback((value) => {
+    const amount = Number.parseFloat(value ?? 0) || 0;
+    return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }, []);
 
   const endpoint = useMemo(() => {
     if (!apiBaseUrl) {
@@ -96,6 +113,8 @@ function ServicesPage() {
     const trimmed = apiBaseUrl.endsWith('/') ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
     return `${trimmed}/api/content/service-packages`;
   }, []);
+
+  const purchaseEndpoint = useMemo(() => endpoint, [endpoint]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -143,9 +162,93 @@ function ServicesPage() {
     };
   }, [endpoint]);
 
-  const handleBookNow = useCallback((pkg) => {
-    console.info('Book package request', pkg);
+  const handleBookNow = useCallback(
+    (pkg) => {
+      if (!pkg) {
+        return;
+      }
+      setSelectedPackage(pkg);
+      setPurchaseForm({
+        fullName: auth.user?.fullName || '',
+        email: auth.user?.email || '',
+        phoneNumber: '',
+        nidNumber: '',
+        notes: '',
+      });
+      setPurchaseFeedback('');
+      setPurchaseStatus('idle');
+    },
+    [auth.user]
+  );
+
+  const closePurchaseModal = useCallback(() => {
+    setSelectedPackage(null);
+    setPurchaseStatus('idle');
+    setPurchaseFeedback('');
   }, []);
+
+  const handlePurchaseInputChange = (event) => {
+    const { name, value } = event.target;
+    setPurchaseForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handlePurchaseSubmit = async (event) => {
+    event.preventDefault();
+    if (!selectedPackage) {
+      return;
+    }
+
+    const packageId = selectedPackage.id ?? selectedPackage.PackageID;
+    if (!packageId) {
+      setPurchaseFeedback('This package is temporarily unavailable.');
+      setPurchaseStatus('failed');
+      return;
+    }
+
+    const payload = {
+      fullName: purchaseForm.fullName.trim(),
+      email: purchaseForm.email.trim(),
+      phoneNumber: purchaseForm.phoneNumber.trim(),
+      nidNumber: purchaseForm.nidNumber.trim(),
+      notes: purchaseForm.notes.trim(),
+    };
+
+    if (!payload.fullName || !payload.email || !payload.phoneNumber) {
+      setPurchaseFeedback('Please provide your full name, email, and phone number.');
+      setPurchaseStatus('failed');
+      return;
+    }
+
+    try {
+      setPurchaseStatus('loading');
+      setPurchaseFeedback('');
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (auth.token) {
+        headers.Authorization = `Bearer ${auth.token}`;
+      }
+
+      const response = await fetch(`${purchaseEndpoint}/${packageId}/purchase`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Unable to process your purchase.');
+      }
+
+      setPurchaseStatus('succeeded');
+      setPurchaseFeedback(data.message || 'Package purchase request submitted successfully.');
+    } catch (err) {
+      setPurchaseStatus('failed');
+      setPurchaseFeedback(err.message || 'Failed to complete your purchase.');
+    }
+  };
+
+  const purchaseButtonDisabled = purchaseStatus === 'loading' || purchaseStatus === 'succeeded';
 
   return (
     <div className="bg-slate-50">
@@ -181,6 +284,128 @@ function ServicesPage() {
           </div>
         ) : null}
       </div>
+
+      {selectedPackage ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 px-4 py-6">
+          <div className="absolute inset-0" role="presentation" onClick={closePurchaseModal} />
+          <div className="relative z-10 w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <header className="space-y-1 text-center">
+              <p className="text-xs font-semibold uppercase tracking-wider text-brand-primary">Purchase package</p>
+              <h2 className="text-2xl font-semibold text-slate-900">{selectedPackage.name}</h2>
+              {selectedPackage.subtitle ? (
+                <p className="text-sm text-slate-500">{selectedPackage.subtitle}</p>
+              ) : null}
+            </header>
+
+            <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              <p>
+                Discounted price:{' '}
+                <span className="font-semibold text-brand-primary">
+                  BDT {formatCurrency(selectedPackage.discountedPrice)}
+                </span>
+              </p>
+              <p>
+                You save{' '}
+                <span className="font-semibold text-emerald-600">
+                  BDT {formatCurrency(selectedPackage.savings)}
+                </span>
+                {' '}with this package.
+              </p>
+            </div>
+
+            <form className="mt-5 grid gap-4" onSubmit={handlePurchaseSubmit}>
+              <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+                Full name
+                <input
+                  type="text"
+                  name="fullName"
+                  value={purchaseForm.fullName}
+                  onChange={handlePurchaseInputChange}
+                  required
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+                Email address
+                <input
+                  type="email"
+                  name="email"
+                  value={purchaseForm.email}
+                  onChange={handlePurchaseInputChange}
+                  required
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+                Phone number
+                <input
+                  type="tel"
+                  name="phoneNumber"
+                  value={purchaseForm.phoneNumber}
+                  onChange={handlePurchaseInputChange}
+                  required
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                />
+              </label>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+                  NID (optional)
+                  <input
+                    type="text"
+                    name="nidNumber"
+                    value={purchaseForm.nidNumber}
+                    onChange={handlePurchaseInputChange}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+                  Notes (optional)
+                  <input
+                    type="text"
+                    name="notes"
+                    value={purchaseForm.notes}
+                    onChange={handlePurchaseInputChange}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                  />
+                </label>
+              </div>
+
+              {purchaseFeedback ? (
+                <div
+                  className={`rounded-2xl border px-4 py-3 text-sm ${
+                    purchaseStatus === 'succeeded'
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : 'border-amber-200 bg-amber-50 text-amber-700'
+                  }`}
+                >
+                  {purchaseFeedback}
+                </div>
+              ) : null}
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closePurchaseModal}
+                  className="inline-flex items-center justify-center rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={purchaseButtonDisabled}
+                  className="inline-flex items-center justify-center rounded-full bg-brand-primary px-6 py-2 text-sm font-semibold text-white shadow transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-brand-primary/60"
+                >
+                  {purchaseStatus === 'loading'
+                    ? 'Processing…'
+                    : purchaseStatus === 'succeeded'
+                    ? 'Purchased!'
+                    : 'Confirm purchase'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

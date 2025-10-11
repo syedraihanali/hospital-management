@@ -89,7 +89,9 @@ function LabReportsTab({ token }) {
           setPatientPackageOrders(orders);
 
           if (!hasManualPackageSelection) {
-            const recentPackage = orders.find((order) => order.packageId);
+            const recentPackage = orders.find((order) =>
+              order.packageId && (order.isActive === undefined || order.isActive)
+            );
             if (recentPackage) {
               setForm((prev) => ({ ...prev, packageId: String(recentPackage.packageId) }));
             }
@@ -149,7 +151,11 @@ function LabReportsTab({ token }) {
     if (!patientPackageOrders.length) {
       return null;
     }
-    return patientPackageOrders.find((order) => order.packageId) || patientPackageOrders[0];
+    return (
+      patientPackageOrders.find(
+        (order) => order.packageId && (order.isActive === undefined || order.isActive)
+      ) || patientPackageOrders[0]
+    );
   }, [patientPackageOrders]);
 
   const latestOrderDateLabel = useMemo(() => {
@@ -361,7 +367,7 @@ function LabReportsTab({ token }) {
           {ordersError ? <p className="text-xs text-rose-600">{ordersError}</p> : null}
           {!ordersLoading && !ordersError && latestPatientOrder ? (
             <p className="text-xs text-emerald-600">
-              Latest purchase: {latestPatientOrder.packageName || 'Package'}
+              Active package: {latestPatientOrder.packageName || 'Package'}
               {latestOrderDateLabel ? ` · ${latestOrderDateLabel}` : ''}
             </p>
           ) : null}
