@@ -562,6 +562,12 @@ async function createServicePackageOrder(packageId, payload = {}) {
     throw error;
   }
 
+  if (!sanitized.nidNumber) {
+    const error = new Error('A valid national ID number is required.');
+    error.status = 400;
+    throw error;
+  }
+
   const paymentMethodOption = findPaymentMethod(sanitized.paymentMethod);
   if (!paymentMethodOption) {
     const error = new Error('Select a valid payment method.');
@@ -597,7 +603,7 @@ async function createServicePackageOrder(packageId, payload = {}) {
     const [result] = await connection.execute(
       `INSERT INTO package_orders
         (PackageID, PatientID, FullName, Email, PhoneNumber, NidNumber, Notes, OriginalPrice, DiscountedPrice, Savings, Status, PackageSnapshot, IsActive)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 1)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, 1)`,
       [
         servicePackage.id,
         normalizedPatientId,
@@ -617,9 +623,9 @@ async function createServicePackageOrder(packageId, payload = {}) {
   });
 
   return {
-    message: 'Package purchase request submitted successfully.',
+    message: 'Package purchase confirmed successfully.',
     orderId,
-    status: 'pending',
+    status: 'confirmed',
     paymentMethod: paymentMethodValue,
     paymentMethodLabel,
     package: {

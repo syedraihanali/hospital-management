@@ -8,23 +8,18 @@ const apiBaseUrl = process.env.REACT_APP_API_URL;
 const paymentMethodOptions = [
   {
     value: 'bkash',
-    label: 'bKash',
-    description: 'Pay securely with your bKash mobile wallet.',
+    label: 'bKash (Mobile Wallet)',
+    description: 'Send the payment from your bKash wallet and include the transaction ID in your notes.',
   },
   {
     value: 'nagad',
-    label: 'Nagad',
-    description: 'Complete the purchase instantly through Nagad.',
+    label: 'Nagad (Mobile Wallet)',
+    description: 'Complete the purchase instantly with your Nagad wallet reference number.',
   },
   {
-    value: 'visa',
-    label: 'Visa',
-    description: 'Use any Visa debit or credit card for payment.',
-  },
-  {
-    value: 'mastercard',
-    label: 'Mastercard',
-    description: 'Pay with your Mastercard for quick confirmation.',
+    value: 'card',
+    label: 'Debit / Credit card',
+    description: 'Use any Visa or Mastercard debit or credit card for instant confirmation.',
   },
 ];
 
@@ -380,6 +375,12 @@ function ServicesPage() {
       return;
     }
 
+    if (!payload.nidNumber) {
+      setPurchaseFeedback('Your national ID number is required to activate this package.');
+      setPurchaseStatus('failed');
+      return;
+    }
+
     if (!payload.paymentMethod) {
       setPurchaseFeedback('Please select a payment method to continue.');
       setPurchaseStatus('failed');
@@ -412,7 +413,7 @@ function ServicesPage() {
       }
 
       setPurchaseStatus('succeeded');
-      setPurchaseFeedback(data.message || 'Package purchase request submitted successfully.');
+      setPurchaseFeedback(data.message || 'Package purchase confirmed successfully.');
       setPurchaseHistoryReloadToken((value) => value + 1);
     } catch (err) {
       setPurchaseStatus('failed');
@@ -423,6 +424,12 @@ function ServicesPage() {
       }
     }
   };
+
+  const selectedPaymentOption = useMemo(() => {
+    return (
+      paymentMethodOptions.find((option) => option.value === purchaseForm.paymentMethod) || null
+    );
+  }, [purchaseForm.paymentMethod]);
 
   const purchaseButtonDisabled = purchaseStatus === 'loading' || purchaseStatus === 'succeeded';
 
@@ -493,157 +500,174 @@ function ServicesPage() {
       </div>
 
       {selectedPackage ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 px-4 py-6">
+        <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-slate-900/40 px-4 py-8 sm:py-12">
           <div className="absolute inset-0" role="presentation" onClick={closePurchaseModal} />
-          <div className="relative z-10 w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
-            <header className="space-y-1 text-center">
-              <p className="text-xs font-semibold uppercase tracking-wider text-brand-primary">Purchase package</p>
-              <h2 className="text-2xl font-semibold text-slate-900">{selectedPackage.name}</h2>
-              {selectedPackage.subtitle ? (
-                <p className="text-sm text-slate-500">{selectedPackage.subtitle}</p>
-              ) : null}
-            </header>
+          <div className="relative z-10 w-full max-w-2xl">
+            <div className="relative flex max-h-[calc(100vh-4rem)] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+              <button
+                type="button"
+                onClick={closePurchaseModal}
+                className="absolute right-5 top-5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
+              >
+                <span className="sr-only">Close purchase form</span>
+                <span aria-hidden="true">×</span>
+              </button>
+              <div className="flex-1 overflow-y-auto px-6 py-6 sm:px-8 sm:py-8">
+                <header className="space-y-1 text-center">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-brand-primary">Purchase package</p>
+                  <h2 className="text-2xl font-semibold text-slate-900">{selectedPackage.name}</h2>
+                  {selectedPackage.subtitle ? (
+                    <p className="text-sm text-slate-500">{selectedPackage.subtitle}</p>
+                  ) : null}
+                </header>
 
-            <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              <p>
-                Discounted price:{' '}
-                <span className="font-semibold text-brand-primary">
-                  BDT {formatCurrency(selectedPackage.discountedPrice)}
-                </span>
-              </p>
-              <p>
-                You save{' '}
-                <span className="font-semibold text-emerald-600">
-                  BDT {formatCurrency(selectedPackage.savings)}
-                </span>
-                {' '}with this package.
-              </p>
-            </div>
+                <form className="mt-6 space-y-6" onSubmit={handlePurchaseSubmit}>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+                      Full name
+                      <input
+                        type="text"
+                        name="fullName"
+                        value={purchaseForm.fullName}
+                        onChange={handlePurchaseInputChange}
+                        required
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+                      Email address
+                      <input
+                        type="email"
+                        name="email"
+                        value={purchaseForm.email}
+                        onChange={handlePurchaseInputChange}
+                        required
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      />
+                    </label>
+                  </div>
 
-            <form className="mt-5 grid gap-4" onSubmit={handlePurchaseSubmit}>
-              <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-                Full name
-                <input
-                  type="text"
-                  name="fullName"
-                  value={purchaseForm.fullName}
-                  onChange={handlePurchaseInputChange}
-                  required
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-                Email address
-                <input
-                  type="email"
-                  name="email"
-                  value={purchaseForm.email}
-                  onChange={handlePurchaseInputChange}
-                  required
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-                Phone number
-                <input
-                  type="tel"
-                  name="phoneNumber"
-                  value={purchaseForm.phoneNumber}
-                  onChange={handlePurchaseInputChange}
-                  required
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                />
-              </label>
-              <fieldset className="rounded-2xl border border-slate-200 px-4 py-3">
-                <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Choose a payment option
-                </legend>
-                <div className="mt-2 grid gap-2">
-                  {paymentMethodOptions.map((option) => {
-                    const isSelected = purchaseForm.paymentMethod === option.value;
-                    return (
-                      <label
-                        key={option.value}
-                        className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2 text-sm transition ${
-                          isSelected
-                            ? 'border-brand-primary bg-brand-primary/5 text-brand-dark'
-                            : 'border-slate-200 hover:border-brand-primary/60'
-                        }`}
-                      >
-                        <input
-                          type="radio"
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+                      Phone number
+                      <input
+                        type="tel"
+                        name="phoneNumber"
+                        value={purchaseForm.phoneNumber}
+                        onChange={handlePurchaseInputChange}
+                        required
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+                      NID number
+                      <input
+                        type="text"
+                        name="nidNumber"
+                        value={purchaseForm.nidNumber}
+                        onChange={handlePurchaseInputChange}
+                        required
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                      />
+                    </label>
+                  </div>
+
+                  <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+                    Notes for our care team (optional)
+                    <textarea
+                      name="notes"
+                      value={purchaseForm.notes}
+                      onChange={handlePurchaseInputChange}
+                      rows={3}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    />
+                  </label>
+
+                  <section className="space-y-4 rounded-3xl border border-emerald-200 bg-emerald-50/70 p-5 text-sm text-emerald-900 shadow-inner">
+                    <header>
+                      <h3 className="text-base font-semibold text-emerald-900">Payment details</h3>
+                      <p className="mt-1 text-xs text-emerald-700">
+                        Discounted price:{' '}
+                        <span className="font-semibold text-emerald-900">
+                          BDT {formatCurrency(selectedPackage.discountedPrice)}
+                        </span>
+                      </p>
+                      <p className="text-xs text-emerald-700">
+                        You save{' '}
+                        <span className="font-semibold text-emerald-900">
+                          BDT {formatCurrency(selectedPackage.savings)}
+                        </span>{' '}
+                        instantly with this package.
+                      </p>
+                    </header>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="flex flex-col text-xs font-semibold text-emerald-900">
+                        Payment method
+                        <select
                           name="paymentMethod"
-                          value={option.value}
-                          checked={isSelected}
+                          value={purchaseForm.paymentMethod}
                           onChange={handlePurchaseInputChange}
-                          className="mt-1"
                           required
-                        />
-                        <span>
-                          <span className="block font-semibold text-slate-700">{option.label}</span>
-                          <span className="text-xs text-slate-500">{option.description}</span>
+                          className="mt-2 w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-emerald-900 shadow-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/60"
+                        >
+                          <option value="">Select a payment method</option>
+                          {paymentMethodOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="mt-1 text-[11px] font-normal text-emerald-700">
+                          {selectedPaymentOption?.description || 'Choose how you would like to complete the payment.'}
                         </span>
                       </label>
-                    );
-                  })}
-                </div>
-              </fieldset>
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-                  NID (optional)
-                  <input
-                    type="text"
-                    name="nidNumber"
-                    value={purchaseForm.nidNumber}
-                    onChange={handlePurchaseInputChange}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-                  Notes (optional)
-                  <input
-                    type="text"
-                    name="notes"
-                    value={purchaseForm.notes}
-                    onChange={handlePurchaseInputChange}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-accent"
-                  />
-                </label>
-              </div>
 
-              {purchaseFeedback ? (
-                <div
-                  className={`rounded-2xl border px-4 py-3 text-sm ${
-                    purchaseStatus === 'succeeded'
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                      : 'border-amber-200 bg-amber-50 text-amber-700'
-                  }`}
-                >
-                  {purchaseFeedback}
-                </div>
-              ) : null}
+                      <div className="rounded-2xl border border-emerald-200/60 bg-white/70 p-3 text-xs text-emerald-800">
+                        <p className="font-semibold text-emerald-900">Instant confirmation</p>
+                        <p className="mt-1 text-[11px]">
+                          Share your transaction details in the notes if needed. Once submitted, your package is confirmed
+                          automatically and the discount becomes active right away.
+                        </p>
+                      </div>
+                    </div>
+                  </section>
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={closePurchaseModal}
-                  className="inline-flex items-center justify-center rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={purchaseButtonDisabled}
-                  className="inline-flex items-center justify-center rounded-full bg-brand-primary px-6 py-2 text-sm font-semibold text-white shadow transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-brand-primary/60"
-                >
-                  {purchaseStatus === 'loading'
-                    ? 'Processing…'
-                    : purchaseStatus === 'succeeded'
-                    ? 'Purchased!'
-                    : 'Confirm purchase'}
-                </button>
+                  {purchaseFeedback ? (
+                    <div
+                      className={`rounded-2xl border px-4 py-3 text-sm ${
+                        purchaseStatus === 'succeeded'
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                          : 'border-amber-200 bg-amber-50 text-amber-700'
+                      }`}
+                    >
+                      {purchaseFeedback}
+                    </div>
+                  ) : null}
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={closePurchaseModal}
+                      className="inline-flex items-center justify-center rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={purchaseButtonDisabled}
+                      className="inline-flex items-center justify-center rounded-full bg-brand-primary px-6 py-2 text-sm font-semibold text-white shadow transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-brand-primary/60"
+                    >
+                      {purchaseStatus === 'loading'
+                        ? 'Processing…'
+                        : purchaseStatus === 'succeeded'
+                        ? 'Package activated'
+                        : 'Activate package'}
+                    </button>
+                  </div>
+                </form>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       ) : null}
