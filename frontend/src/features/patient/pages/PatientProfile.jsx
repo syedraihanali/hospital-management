@@ -3,6 +3,12 @@ import { Link } from 'react-router-dom';
 import { AuthContext } from '../../auth/context/AuthContext';
 import { FaCalendarCheck } from 'react-icons/fa';
 
+const packageStatusLabels = {
+  pending: 'Awaiting confirmation',
+  confirmed: 'Active',
+  cancelled: 'Cancelled',
+};
+
 function PatientProfile() {
   const { auth } = useContext(AuthContext);
   const apiBaseUrl = (process.env.REACT_APP_API_URL || '').replace(/\/$/, '');
@@ -169,6 +175,8 @@ function PatientProfile() {
           savings: Number.parseFloat(savings.toFixed(2)),
           discountRate,
           status: order.status || 'pending',
+          paymentMethod: order.paymentMethod || order.paymentMethodLabel || '',
+          paymentMethodLabel: order.paymentMethodLabel || '',
         };
       })
       .slice(0, 1);
@@ -553,12 +561,15 @@ function PatientProfile() {
           <ul className="mt-6 grid gap-4">
             {recentPackages.map((order) => {
               const discountPercent = Math.round(order.discountRate * 100);
+              const statusKey = String(order.status || 'pending').toLowerCase();
+              const statusLabel = packageStatusLabels[statusKey] || order.status || 'Pending';
               const statusColor =
-                order.status === 'confirmed'
+                statusKey === 'confirmed'
                   ? 'text-emerald-600'
-                  : order.status === 'cancelled'
+                  : statusKey === 'cancelled'
                   ? 'text-rose-600'
                   : 'text-amber-600';
+              const paymentDescription = order.paymentMethodLabel || order.paymentMethod || '';
 
               return (
                 <li
@@ -590,9 +601,10 @@ function PatientProfile() {
                     </div>
                   </div>
 
-                  <p className={`mt-3 text-xs font-semibold ${statusColor}`}>
-                    Status: {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                  </p>
+                  <p className={`mt-3 text-xs font-semibold ${statusColor}`}>Status: {statusLabel}</p>
+                  {paymentDescription ? (
+                    <p className="text-xs text-slate-500">Payment method: {paymentDescription}</p>
+                  ) : null}
                 </li>
               );
             })}
