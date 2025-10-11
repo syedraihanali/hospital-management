@@ -141,6 +141,7 @@ CREATE TABLE IF NOT EXISTS package_orders (
     Status ENUM('pending', 'confirmed', 'cancelled') NOT NULL DEFAULT 'pending',
     PackageSnapshot LONGTEXT NULL,
     CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    IsActive TINYINT(1) NOT NULL DEFAULT 1,
     FOREIGN KEY (PackageID) REFERENCES service_packages(PackageID)
         ON UPDATE CASCADE
         ON DELETE CASCADE,

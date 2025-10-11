@@ -408,6 +408,7 @@ async function createPackageOrdersTable() {
   );
   await addColumnIfMissing('package_orders', 'PackageSnapshot', 'LONGTEXT NULL');
   await addColumnIfMissing('package_orders', 'CreatedAt', 'DATETIME DEFAULT CURRENT_TIMESTAMP');
+  await addColumnIfMissing('package_orders', 'IsActive', 'TINYINT(1) NOT NULL DEFAULT 1');
 }
 
 async function createLabTestsTable() {
