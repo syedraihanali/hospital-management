@@ -272,12 +272,13 @@ async function getServicePackages() {
   }
 
   const packageIds = packages.map((pkg) => pkg.PackageID);
+  const placeholders = packageIds.map(() => '?').join(', ');
   const packageItems = await execute(
     `SELECT PackageItemID, PackageID, ItemName, ItemPrice, SortOrder
      FROM service_package_items
-     WHERE PackageID IN (?)
+     WHERE PackageID IN (${placeholders})
      ORDER BY SortOrder ASC, PackageItemID ASC`,
-    [packageIds]
+    packageIds
   );
 
   return packages.map((pkg) => {
