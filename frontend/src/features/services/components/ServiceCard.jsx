@@ -13,7 +13,13 @@ const formatCurrency = (value) => {
   });
 };
 
-export default function ServiceCard({ packageData, onBook }) {
+const purchaseStatusLabelMap = {
+  pending: 'Awaiting confirmation',
+  confirmed: 'Active package',
+  cancelled: 'Cancelled',
+};
+
+export default function ServiceCard({ packageData, onBook, purchaseState }) {
   const { name, subtitle, ribbonText, discountedPrice } = packageData;
 
   const items = useMemo(() => {
@@ -65,8 +71,61 @@ export default function ServiceCard({ packageData, onBook }) {
     return '';
   }, [ribbonText, savings]);
 
+  const purchaseDisplay = useMemo(() => {
+    if (!purchaseState) {
+      return null;
+    }
+
+    const statusKey = String(purchaseState.status || 'pending').toLowerCase();
+    const statusLabel = purchaseStatusLabelMap[statusKey] || 'Purchased';
+    const badgeClass =
+      statusKey === 'confirmed'
+        ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+        : 'border border-amber-200 bg-amber-50 text-amber-700';
+
+    return {
+      statusKey,
+      statusLabel,
+      badgeClass,
+    };
+  }, [purchaseState]);
+
+  const purchaseDateLabel = useMemo(() => {
+    if (!purchaseState?.purchasedAt) {
+      return '';
+    }
+    const parsed = new Date(purchaseState.purchasedAt);
+    if (Number.isNaN(parsed.getTime())) {
+      return '';
+    }
+    return parsed.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }, [purchaseState?.purchasedAt]);
+
+  const buttonDisabled = Boolean(purchaseDisplay);
+  const buttonLabel = useMemo(() => {
+    if (!purchaseDisplay) {
+      return 'Purchase package';
+    }
+    if (purchaseDisplay.statusKey === 'confirmed') {
+      return 'Purchased';
+    }
+    return 'Awaiting confirmation';
+  }, [purchaseDisplay]);
+
   return (
     <div className="relative w-full overflow-hidden rounded-2xl bg-white p-6 font-sans shadow-md">
+      {purchaseDisplay ? (
+        <div className="absolute right-4 top-4 flex flex-col items-end gap-1 text-xs font-semibold">
+          <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 ${purchaseDisplay.badgeClass}`}>
+            Purchased
+          </span>
+          <span className="text-[11px] font-medium text-slate-500">{purchaseDisplay.statusLabel}</span>
+        </div>
+      ) : null}
       {resolvedRibbonText ? (
         <div className="absolute top-9 -left-14" aria-hidden="true">
           <div className="relative">
@@ -123,15 +182,32 @@ export default function ServiceCard({ packageData, onBook }) {
         </table>
         <button
           type="button"
-          className="mt-4 rounded-full bg-brand-primary px-12 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark"
+          className="mt-4 rounded-full bg-brand-primary px-12 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+          disabled={buttonDisabled}
           onClick={() => {
-            if (typeof onBook === 'function') {
+            if (typeof onBook === 'function' && !buttonDisabled) {
               onBook(packageData);
             }
           }}
         >
-          Purchase package
+          {buttonLabel}
         </button>
+        {purchaseDisplay ? (
+          <div className="mt-3 space-y-1 rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-600">
+            <p className="font-medium text-slate-700">
+              {purchaseDisplay.statusKey === 'confirmed'
+                ? 'This package is active for your reports.'
+                : 'We will confirm your request shortly.'}
+            </p>
+            {purchaseState?.paymentMethodLabel ? (
+              <p>
+                Payment method:{' '}
+                <span className="font-semibold text-slate-700">{purchaseState.paymentMethodLabel}</span>
+              </p>
+            ) : null}
+            {purchaseDateLabel ? <p>Requested on {purchaseDateLabel}</p> : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -158,8 +234,15 @@ ServiceCard.propTypes = {
     ),
   }).isRequired,
   onBook: PropTypes.func,
+  purchaseState: PropTypes.shape({
+    status: PropTypes.string,
+    purchasedAt: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)]),
+    paymentMethod: PropTypes.string,
+    paymentMethodLabel: PropTypes.string,
+  }),
 };
 
 ServiceCard.defaultProps = {
   onBook: undefined,
+  purchaseState: null,
 };

@@ -1,4 +1,5 @@
 const { execute, transaction } = require('../database/query');
+const { findPaymentMethod } = require('../constants/paymentMethods');
 
 function parseJSON(value, fallback = {}) {
   if (!value) {
@@ -537,6 +538,7 @@ async function createServicePackageOrder(packageId, payload = {}) {
     phoneNumber: trimString(payload.phoneNumber || payload.phone),
     nidNumber: trimString(payload.nidNumber || payload.nid),
     notes: trimString(payload.notes),
+    paymentMethod: trimString(payload.paymentMethod),
   };
 
   const patientIdValue = Number.parseInt(payload.patientId, 10);
@@ -560,6 +562,16 @@ async function createServicePackageOrder(packageId, payload = {}) {
     throw error;
   }
 
+  const paymentMethodOption = findPaymentMethod(sanitized.paymentMethod);
+  if (!paymentMethodOption) {
+    const error = new Error('Select a valid payment method.');
+    error.status = 400;
+    throw error;
+  }
+
+  const paymentMethodValue = paymentMethodOption.value;
+  const paymentMethodLabel = paymentMethodOption.label;
+
   const originalPrice =
     Number.parseFloat(servicePackage.totalPrice ?? servicePackage.originalPrice ?? 0) || 0;
   const discountedPrice = Number.parseFloat(servicePackage.discountedPrice ?? 0) || 0;
@@ -573,6 +585,8 @@ async function createServicePackageOrder(packageId, payload = {}) {
     originalPrice,
     discountedPrice,
     savings,
+    paymentMethod: paymentMethodValue,
+    paymentMethodLabel,
   });
 
   const orderId = await transaction(async (connection) => {
@@ -606,6 +620,8 @@ async function createServicePackageOrder(packageId, payload = {}) {
     message: 'Package purchase request submitted successfully.',
     orderId,
     status: 'pending',
+    paymentMethod: paymentMethodValue,
+    paymentMethodLabel,
     package: {
       id: servicePackage.id,
       name: servicePackage.name,

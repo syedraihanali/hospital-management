@@ -192,6 +192,8 @@ async function listPatientPackageOrders(patientId) {
       nidNumber: row.NidNumber,
       notes: row.Notes,
       items: Array.isArray(snapshot.items) ? snapshot.items : [],
+      paymentMethod: snapshot.paymentMethod || null,
+      paymentMethodLabel: snapshot.paymentMethodLabel || null,
     };
   });
 }

@@ -7,6 +7,7 @@ const {
   createServicePackageOrder,
 } = require('../services/contentService');
 const { findPatientById } = require('../services/patientService');
+const { findPaymentMethod } = require('../constants/paymentMethods');
 
 async function fetchAboutContent(_req, res) {
   const content = await getAboutContent();
@@ -61,6 +62,7 @@ async function purchaseServicePackage(req, res) {
     nidNumber = '',
     nid = '',
     notes = '',
+    paymentMethod = '',
   } = req.body || {};
 
   let patientId = null;
@@ -100,6 +102,11 @@ async function purchaseServicePackage(req, res) {
 
   const trimmedNid = String(nidNumber || nid || '').trim();
   const trimmedNotes = String(notes || '').trim();
+  const paymentMethodOption = findPaymentMethod(paymentMethod);
+
+  if (!paymentMethodOption) {
+    return res.status(400).json({ message: 'Please choose a valid payment method.' });
+  }
 
   try {
     const order = await createServicePackageOrder(packageId, {
@@ -109,6 +116,7 @@ async function purchaseServicePackage(req, res) {
       nidNumber: trimmedNid,
       notes: trimmedNotes,
       patientId,
+      paymentMethod: paymentMethodOption.value,
     });
     return res.status(201).json(order);
   } catch (error) {
